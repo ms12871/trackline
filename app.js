@@ -101,6 +101,24 @@ function timestampSeconds(value) {
   return Number(value);
 }
 
+function getTrackNumber(stopUpdate) {
+  const stopProperties = stopUpdate.stopTimeProperties || stopUpdate.stop_time_properties || {};
+  const fields = ["trackNumber", "track_number", "track", "platformNumber", "platform_number", "platform"];
+
+  for (const field of fields) {
+    const value = stopUpdate[field] ?? stopProperties[field];
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (typeof value !== "string") continue;
+
+    const text = value.trim();
+    const labeledTrack = text.match(/^(?:track|platform)\s*([a-z0-9-]+)$/i);
+    if (labeledTrack) return labeledTrack[1];
+    if (/^(?:[a-z]?\d+[a-z]?)$/i.test(text)) return text;
+  }
+
+  return null;
+}
+
 function formatTime(seconds) {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
@@ -229,6 +247,8 @@ function getRouteTrips(feed, fromId, toId) {
       id: update.trip?.tripId || entity.id,
       departure,
       arrival,
+      departureTrack: getTrackNumber(fromStop),
+      arrivalTrack: getTrackNumber(toStop),
       delay: Number.isFinite(Number(delay)) ? Number(delay) : null,
       route: update.trip?.routeId || "LIRR"
     });
@@ -275,6 +295,14 @@ function renderDepartures(trips, scheduled = false) {
     row.querySelector(".departure-relative").textContent = relativeDeparture(trip.departure, nowSeconds);
     row.querySelector(".train-name").textContent = trip.route === "LIRR" ? "Long Island Rail Road" : `LIRR · ${trip.route}`;
     row.querySelector(".train-summary").textContent = `Train ${trip.id}`;
+    const trackInfo = row.querySelector(".track-info");
+    const trackDetails = [];
+    if (trip.departureTrack) trackDetails.push(`Departs on track ${trip.departureTrack}`);
+    if (trip.arrivalTrack) trackDetails.push(`Arrives on track ${trip.arrivalTrack}`);
+    if (trackDetails.length > 0) {
+      trackInfo.textContent = trackDetails.join(" · ");
+      trackInfo.hidden = false;
+    }
     row.querySelector(".arrival-time").textContent = formatTime(trip.arrival);
     row.querySelector(".arrival-time").dateTime = new Date(trip.arrival * 1000).toISOString();
 
