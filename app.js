@@ -1,0 +1,402 @@
+import bindings from "https://esm.sh/gtfs-realtime-bindings@1.1.1?bundle";
+
+const FEED_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr";
+const SCHEDULE_URL = "./schedule.json";
+const REFRESH_INTERVAL = 30_000;
+const MAX_LOOKAHEAD = 2 * 60 * 60;
+const STATIONS = [
+  ["1", "Albertson"], ["100", "Islip"], ["101", "Inwood"], ["102", "Jamaica"],
+  ["107", "Kew Gardens"], ["11", "Broadway"], ["111", "Kings Park"], ["113", "Long Beach"],
+  ["114", "Lawrence"], ["117", "Lindenhurst"], ["118", "Long Island City"], ["119", "Locust Manor"],
+  ["120", "Little Neck"], ["122", "Laurelton"], ["123", "Locust Valley"], ["124", "Lakeview"],
+  ["125", "Lynbrook"], ["126", "Mattituck"], ["127", "Merillon Avenue"], ["129", "Medford"],
+  ["13", "Bridgehampton"], ["130", "Murray Hill"], ["131", "Manhasset"], ["132", "Mineola"],
+  ["135", "Massapequa Park"], ["136", "Massapequa"], ["14", "Stony Brook"], ["140", "Mastic-Shirley"],
+  ["141", "Montauk"], ["142", "Malverne"], ["148", "Nostrand Avenue"], ["149", "Nassau Boulevard"],
+  ["152", "New Hyde Park"], ["153", "Northport"], ["154", "Oyster Bay"], ["155", "Oceanside"],
+  ["157", "Oakdale"], ["16", "Bellmore"], ["162", "Plandome"], ["163", "Patchogue"],
+  ["164", "Port Jefferson"], ["165", "Pinelawn"], ["171", "Port Washington"], ["175", "Queens Village"],
+  ["176", "Riverhead"], ["179", "Ronkonkoma"], ["180", "Rosedale"], ["182", "Roslyn"],
+  ["183", "Rockville Centre"], ["184", "St. Albans"], ["185", "Sea Cliff"], ["187", "Seaford"],
+  ["190", "Southold"], ["191", "Southampton"], ["193", "St. James"], ["195", "Stewart Manor"],
+  ["198", "Speonk"], ["199", "Mets-Willets Point"], ["2", "Auburndale"], ["20", "Bethpage"],
+  ["202", "Smithtown"], ["204", "Sayville"], ["205", "Syosset"], ["21", "Bellport"],
+  ["211", "Valley Stream"], ["213", "Westbury"], ["214", "Woodside"], ["215", "Wantagh"],
+  ["216", "West Hempstead"], ["217", "Woodmere"], ["219", "Westwood"], ["220", "Wyandanch"],
+  ["223", "Yaphank-BNL"], ["225", "Baldwin"], ["226", "Merrick"], ["23", "Bellerose"],
+  ["233", "Westhampton"], ["237", "Penn Station"], ["24", "Belmont Park"], ["241", "Atlantic Terminal"],
+  ["25", "Bayside"], ["26", "Bay Shore"], ["27", "Babylon"], ["29", "Brentwood"],
+  ["31", "Centre Avenue"], ["32", "Cedarhurst"], ["33", "Central Islip"], ["349", "Grand Central"],
+  ["359", "Elmont-UBS Arena"], ["36", "Country Life Press"], ["38", "Copiague"], ["39", "Carle Place"],
+  ["4", "Amagansett"], ["40", "Cold Spring Harbor"], ["42", "Douglaston"], ["44", "Deer Park"],
+  ["48", "East Hampton"], ["50", "East New York"], ["51", "East Rockaway"], ["52", "East Williston"],
+  ["55", "Forest Hills"], ["56", "Flushing Main Street"], ["59", "Farmingdale"], ["63", "Floral Park"],
+  ["64", "Freeport"], ["65", "Far Rockaway"], ["66", "Gibson"], ["67", "Glen Cove"],
+  ["68", "Garden City"], ["71", "Glen Head"], ["72", "Great Neck"], ["73", "Greenport"],
+  ["74", "Great River"], ["76", "Glen Street"], ["77", "Greenvale"], ["78", "Greenlawn"],
+  ["8", "Amityville"], ["83", "Hampton Bays"], ["84", "Hempstead"], ["85", "Hempstead Gardens"],
+  ["86", "Hillside Facility"], ["89", "Hollis"], ["90", "Hunterspoint Avenue"], ["91", "Huntington"],
+  ["92", "Hicksville"], ["94", "Hewlett"], ["99", "Island Park"]
+].map(([id, name]) => ({ id, name })).sort((first, second) => first.name.localeCompare(second.name));
+
+const { transit_realtime: transitRealtime } = bindings;
+const elements = {
+  connection: document.querySelector("#connection-label"),
+  time: document.querySelector("#current-time"),
+  date: document.querySelector("#current-date"),
+  form: document.querySelector("#route-form"),
+  from: document.querySelector("#from-station"),
+  to: document.querySelector("#to-station"),
+  swap: document.querySelector("#swap-stations"),
+  find: document.querySelector("#find-trains"),
+  routeError: document.querySelector("#route-error"),
+  originLabel: document.querySelector("#board-origin"),
+  destinationLabel: document.querySelector("#board-destination"),
+  updated: document.querySelector("#updated-label"),
+  departures: document.querySelector("#departures"),
+  refresh: document.querySelector("#refresh-button"),
+  template: document.querySelector("#departure-template")
+};
+
+const stationNames = new Map(STATIONS.map((station) => [station.id, station.name]));
+let requestNumber = 0;
+let schedulePromise;
+
+function populateStations() {
+  const savedFrom = localStorage.getItem("trackline-from") || "237";
+  const savedTo = localStorage.getItem("trackline-to") || "102";
+
+  for (const select of [elements.from, elements.to]) {
+    const fragment = document.createDocumentFragment();
+    for (const station of STATIONS) {
+      const option = document.createElement("option");
+      option.value = station.id;
+      option.textContent = station.name;
+      fragment.append(option);
+    }
+    select.append(fragment);
+  }
+
+  elements.from.value = stationNames.has(savedFrom) ? savedFrom : "237";
+  elements.to.value = stationNames.has(savedTo) ? savedTo : "102";
+}
+
+function updateClock() {
+  const now = new Date();
+  elements.time.textContent = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(now);
+  elements.date.textContent = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  }).format(now).toUpperCase();
+}
+
+function timestampSeconds(value) {
+  if (typeof value?.toNumber === "function") return value.toNumber();
+  return Number(value);
+}
+
+function formatTime(seconds) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(seconds * 1000));
+}
+
+function relativeDeparture(seconds, nowSeconds) {
+  const minutes = Math.max(0, Math.round((seconds - nowSeconds) / 60));
+  return minutes < 1 ? "Due" : `in ${minutes} min`;
+}
+
+function currentServiceDate() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}${values.month}${values.day}`;
+}
+
+function scheduledTimestamp(serviceDate, timeText) {
+  const [year, month, day] = [
+    Number(serviceDate.slice(0, 4)),
+    Number(serviceDate.slice(4, 6)),
+    Number(serviceDate.slice(6, 8))
+  ];
+  const [hours, minutes, seconds] = timeText.split(":").map(Number);
+  if (![year, month, day, hours, minutes, seconds].every(Number.isFinite)) return NaN;
+
+  const wallClock = Date.UTC(year, month - 1, day, hours, minutes, seconds);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  });
+  let timestamp = wallClock;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const values = Object.fromEntries(formatter.formatToParts(new Date(timestamp)).map((part) => [part.type, part.value]));
+    const representedTime = Date.UTC(
+      Number(values.year), Number(values.month) - 1, Number(values.day),
+      Number(values.hour), Number(values.minute), Number(values.second)
+    );
+    timestamp = wallClock - (representedTime - timestamp);
+  }
+
+  return timestamp / 1000;
+}
+
+async function loadSchedule() {
+  if (!schedulePromise) {
+    schedulePromise = fetch(SCHEDULE_URL, { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Schedule returned ${response.status}`);
+        return response.json();
+      })
+      .catch((error) => {
+        schedulePromise = undefined;
+        throw error;
+      });
+  }
+  return schedulePromise;
+}
+
+function getNextScheduledTrip(schedule, fromId, toId) {
+  const nowSeconds = Date.now() / 1000;
+  const today = currentServiceDate();
+  let nextTrip = null;
+
+  for (const [serviceDate, serviceIds] of Object.entries(schedule.servicesByDate || {})) {
+    if (serviceDate < today) continue;
+    const activeServices = new Set(serviceIds);
+
+    for (const [tripId, routeId, serviceId, stops] of schedule.trips || []) {
+      if (!activeServices.has(serviceId)) continue;
+      const fromIndex = stops.findIndex((stop) => String(stop[0]) === fromId);
+      if (fromIndex < 0) continue;
+      const toIndex = stops.findIndex((stop, index) => index > fromIndex && String(stop[0]) === toId);
+      if (toIndex < 0) continue;
+
+      const departure = scheduledTimestamp(serviceDate, stops[fromIndex][2] || stops[fromIndex][1]);
+      const arrival = scheduledTimestamp(serviceDate, stops[toIndex][1] || stops[toIndex][2]);
+      if (!Number.isFinite(departure) || !Number.isFinite(arrival) || departure < nowSeconds - 60) continue;
+      if (!nextTrip || departure < nextTrip.departure) {
+        nextTrip = { id: tripId, route: routeId || "LIRR", departure, arrival, delay: null };
+      }
+    }
+  }
+
+  return nextTrip;
+}
+
+function getRouteTrips(feed, fromId, toId) {
+  const nowSeconds = Date.now() / 1000;
+  const results = [];
+
+  for (const entity of feed.entity || []) {
+    const update = entity.tripUpdate;
+    if (!update || update.trip?.scheduleRelationship === 3) continue;
+
+    const stops = update.stopTimeUpdate || [];
+    const fromIndex = stops.findIndex((stop) => String(stop.stopId) === fromId);
+    if (fromIndex < 0) continue;
+
+    const toIndex = stops.findIndex((stop, index) => index > fromIndex && String(stop.stopId) === toId);
+    if (toIndex < 0) continue;
+
+    const fromStop = stops[fromIndex];
+    const toStop = stops[toIndex];
+    const departure = timestampSeconds(fromStop.departure?.time ?? fromStop.arrival?.time);
+    const arrival = timestampSeconds(toStop.arrival?.time ?? toStop.departure?.time);
+    if (!Number.isFinite(departure) || !Number.isFinite(arrival)) continue;
+    if (departure < nowSeconds - 90 || departure > nowSeconds + MAX_LOOKAHEAD) continue;
+
+    const delay = fromStop.departure?.delay ?? fromStop.arrival?.delay;
+    results.push({
+      id: update.trip?.tripId || entity.id,
+      departure,
+      arrival,
+      delay: Number.isFinite(Number(delay)) ? Number(delay) : null,
+      route: update.trip?.routeId || "LIRR"
+    });
+  }
+
+  return results.sort((first, second) => first.departure - second.departure).slice(0, 8);
+}
+
+function showMessage(kind, heading, message, linkLabel, linkHref) {
+  const state = document.createElement("div");
+  state.className = `${kind}-state`;
+  const title = document.createElement("strong");
+  title.textContent = heading;
+  const body = document.createElement("span");
+  body.textContent = message;
+  state.append(title, body);
+
+  if (linkLabel && linkHref) {
+    const link = document.createElement("a");
+    link.href = linkHref;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = linkLabel;
+    state.append(link);
+  }
+
+  elements.departures.replaceChildren(state);
+}
+
+function renderDepartures(trips, scheduled = false) {
+  if (trips.length === 0) {
+    showMessage("empty", "No upcoming trains on this route", "Try another station pair or check back shortly.");
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  const nowSeconds = Date.now() / 1000;
+
+  for (const [index, trip] of trips.entries()) {
+    const row = elements.template.content.firstElementChild.cloneNode(true);
+    row.style.animationDelay = `${index * 45}ms`;
+    row.querySelector(".departure-time").textContent = formatTime(trip.departure);
+    row.querySelector(".departure-time").dateTime = new Date(trip.departure * 1000).toISOString();
+    row.querySelector(".departure-relative").textContent = relativeDeparture(trip.departure, nowSeconds);
+    row.querySelector(".train-name").textContent = trip.route === "LIRR" ? "Long Island Rail Road" : `LIRR · ${trip.route}`;
+    row.querySelector(".train-summary").textContent = `Train ${trip.id}`;
+    row.querySelector(".arrival-time").textContent = formatTime(trip.arrival);
+    row.querySelector(".arrival-time").dateTime = new Date(trip.arrival * 1000).toISOString();
+
+    const status = document.createElement("span");
+    status.className = "status-pill";
+    if (scheduled) {
+      status.classList.add("scheduled");
+      status.textContent = "SCHEDULED";
+    } else if (trip.delay === null) {
+      status.classList.add("unknown");
+      status.textContent = "LIVE UPDATE";
+    } else if (trip.delay >= 60) {
+      status.classList.add("delayed");
+      status.textContent = `${Math.round(trip.delay / 60)} MIN LATE`;
+    } else if (trip.delay <= -60) {
+      status.classList.add("unknown");
+      status.textContent = `${Math.round(Math.abs(trip.delay) / 60)} MIN EARLY`;
+    } else {
+      status.textContent = "ON TIME";
+    }
+    row.querySelector(".status-block").append(status);
+    fragment.append(row);
+  }
+
+  elements.departures.replaceChildren(fragment);
+}
+
+function updateRouteLabels() {
+  elements.originLabel.textContent = stationNames.get(elements.from.value);
+  elements.destinationLabel.textContent = stationNames.get(elements.to.value);
+  elements.routeError.hidden = true;
+}
+
+async function loadDepartures() {
+  const fromId = elements.from.value;
+  const toId = elements.to.value;
+  if (fromId === toId) {
+    elements.routeError.textContent = "Choose two different stations to find trains.";
+    elements.routeError.hidden = false;
+    return;
+  }
+
+  localStorage.setItem("trackline-from", fromId);
+  localStorage.setItem("trackline-to", toId);
+  updateRouteLabels();
+
+  const thisRequest = ++requestNumber;
+  elements.find.disabled = true;
+  elements.refresh.classList.add("is-spinning");
+  elements.departures.setAttribute("aria-busy", "true");
+  elements.updated.textContent = "FETCHING LIVE DATA";
+  if (elements.departures.children.length === 0 || elements.departures.querySelector(".empty-state, .error-state, .loading-state")) {
+    elements.departures.replaceChildren();
+    const loading = document.createElement("div");
+    loading.className = "loading-state";
+    loading.innerHTML = '<span class="loading-bar"></span><span>Checking live departures</span>';
+    elements.departures.append(loading);
+  }
+
+  try {
+    const response = await fetch(FEED_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error(`MTA feed returned ${response.status}`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const feed = transitRealtime.FeedMessage.decode(bytes);
+    if (thisRequest !== requestNumber) return;
+
+    const realtimeTrips = getRouteTrips(feed, fromId, toId);
+    if (realtimeTrips.length > 0) {
+      renderDepartures(realtimeTrips);
+    } else {
+      try {
+        const scheduledTrip = getNextScheduledTrip(await loadSchedule(), fromId, toId);
+        if (scheduledTrip) {
+          renderDepartures([scheduledTrip], true);
+          elements.updated.textContent = "NEXT SCHEDULED DEPARTURE · NO LIVE TRAINS";
+        } else {
+          showMessage("empty", "No upcoming train found", "There is no scheduled train for this route in the current timetable.");
+        }
+      } catch (scheduleError) {
+        console.error("Unable to load the LIRR schedule:", scheduleError);
+        showMessage("empty", "No live train found", "The scheduled timetable is unavailable right now. Try refreshing shortly.");
+      }
+    }
+    elements.connection.textContent = "LIVE FEED";
+    if (realtimeTrips.length > 0) {
+      elements.updated.textContent = `UPDATED ${new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(new Date()).toUpperCase()}`;
+    }
+  } catch (error) {
+    if (thisRequest !== requestNumber) return;
+    console.error("Unable to load the MTA LIRR feed:", error);
+    elements.connection.textContent = "FEED UNAVAILABLE";
+    elements.updated.textContent = "LIVE DATA UNAVAILABLE";
+    showMessage("error", "Could not reach live departures", "Check your connection and try again. The MTA feed is public and requires no API key.", "MTA feed status", "https://api.mta.info/");
+  } finally {
+    if (thisRequest === requestNumber) {
+      elements.find.disabled = false;
+      elements.refresh.classList.remove("is-spinning");
+      elements.departures.setAttribute("aria-busy", "false");
+    }
+  }
+}
+
+populateStations();
+updateClock();
+updateRouteLabels();
+setInterval(updateClock, 15_000);
+elements.form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  loadDepartures();
+});
+elements.refresh.addEventListener("click", loadDepartures);
+elements.swap.addEventListener("click", () => {
+  const previousFrom = elements.from.value;
+  elements.from.value = elements.to.value;
+  elements.to.value = previousFrom;
+  loadDepartures();
+});
+
+loadDepartures();
+setInterval(loadDepartures, REFRESH_INTERVAL);

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f3f2ec">
+    <meta name="description" content="Live MTA bus arrivals by route, direction, and stop.">
+    <title>Trackline | BusTime arrivals</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script type="module" src="bustime.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="wordmark" href="./" aria-label="Trackline home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>trackline<span class="wordmark-period">.</span></span>
+        </a>
+        <div class="topbar-right">
+          <span class="network-label">MTA BUS TIME</span>
+          <span class="live-indicator"><span class="live-dot"></span><span id="connection-label">CONNECTING</span></span>
+          <nav class="network-nav" aria-label="Transit mode">
+            <a class="network-switch" href="index.html">LIRR</a>
+            <a class="network-switch" href="subway.html">Subway</a>
+            <a class="network-switch" href="bustime.html" aria-current="page">BusTime</a>
+          </nav>
+        </div>
+      </header>
+
+      <main>
+        <section class="route-section" aria-labelledby="page-title">
+          <div class="section-kicker"><span class="kicker-rule"></span> MTA BUS TIME, RIGHT NOW</div>
+          <div class="intro-row">
+            <div>
+              <h1 id="page-title">At the stop.<br><span>On the clock.</span></h1>
+              <p class="intro-copy">Live arrivals by route, direction, and stop.</p>
+            </div>
+            <div class="service-clock" aria-label="Current local time">
+              <span class="clock-label">NEW YORK TIME</span>
+              <time id="current-time">--:--</time>
+              <span id="current-date" class="date-label">---</span>
+            </div>
+          </div>
+
+          <form id="bus-search-form" class="bus-search-form">
+            <label class="bus-search-field">
+              <span class="field-label">BUS ROUTE</span>
+              <input id="route-query" type="search" value="M15" placeholder="M15, B63, Q60" autocomplete="off" aria-label="Search bus route">
+            </label>
+            <button id="search-routes" class="find-button" type="submit">
+              <span>Find route</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+            </button>
+          </form>
+
+          <div class="bus-controls">
+            <label class="station-field">
+              <span class="field-label">ROUTE</span>
+              <select id="bus-route" aria-label="Bus route" disabled></select>
+            </label>
+            <label class="station-field">
+              <span class="field-label">DIRECTION</span>
+              <select id="bus-direction" aria-label="Bus direction" disabled></select>
+            </label>
+            <label class="station-field">
+              <span class="field-label">STOP</span>
+              <select id="bus-stop" aria-label="Bus stop" disabled></select>
+            </label>
+          </div>
+          <div id="bus-error" class="route-error" role="alert" hidden></div>
+        </section>
+
+        <section class="departures-section" aria-labelledby="arrivals-title">
+          <div class="departures-heading">
+            <div>
+              <div class="section-kicker"><span class="kicker-rule"></span> LIVE ARRIVALS</div>
+              <h2 id="arrivals-title">Next buses</h2>
+            </div>
+            <button id="refresh-button" class="icon-button" type="button" aria-label="Refresh bus arrivals" title="Refresh bus arrivals">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m-3.5-2a7 7 0 0 1 12-2L20 12M4 12l2.5 4a7 7 0 0 0 12-2"/></svg>
+            </button>
+          </div>
+
+          <div class="board-meta">
+            <div class="board-route"><span id="board-route-label">M15</span><span class="route-arrow" aria-hidden="true">·</span><span id="board-stop-label">Choose a stop</span></div>
+            <span id="updated-label" class="updated-label">WAITING FOR LIVE DATA</span>
+          </div>
+
+          <div id="bus-arrivals" class="departures-list" aria-live="polite" aria-busy="true">
+            <div class="loading-state"><span class="loading-bar"></span><span>Connecting to MTA BusTime</span></div>
+          </div>
+
+          <div class="board-footer">
+            <span class="source-label"><span class="source-dot"></span> MTA BUSTIME SIRI</span>
+            <span>REFRESHES EVERY 30 SECONDS</span>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>Made with Love from Zafar</span>
+        <a href="https://bustime.mta.info/" target="_blank" rel="noreferrer">DATA BY MTA <span aria-hidden="true">↗</span></a>
+      </footer>
+    </div>
+
+    <template id="bus-arrival-template">
+      <article class="departure-row bus-arrival-row">
+        <div class="departure-time-block">
+          <span class="event-label">ARRIVES</span>
+          <time class="departure-time"></time>
+          <span class="departure-relative"></span>
+        </div>
+        <div class="departure-details">
+          <div class="subway-train-title"><span class="bus-route-badge"></span><span class="train-name"></span></div>
+          <div class="train-summary">
+            <span class="train-direction"></span>
+            <span class="train-id"></span>
+            <span class="bus-distance"></span>
+          </div>
+        </div>
+        <div class="status-block"></div>
+      </article>
+    </template>
+  </body>
+</html>
