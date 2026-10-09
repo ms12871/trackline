@@ -96,6 +96,15 @@ function showMessage(className, titleText, messageText, linkText, linkHref) {
     state.append(link);
   }
 
+  if (className === "error-state") {
+    const retry = document.createElement("button");
+    retry.className = "retry-button";
+    retry.type = "button";
+    retry.textContent = "Try again";
+    retry.addEventListener("click", () => elements.refresh.click());
+    state.append(retry);
+  }
+
   elements.arrivals.replaceChildren(state);
 }
 

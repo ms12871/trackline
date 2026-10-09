@@ -203,6 +203,23 @@ h1 span { color: #819253; }
 .find-button svg { width: 18px; height: 18px; }
 .route-error { margin-top: 12px; color: #a13f28; font-size: 12px; }
 
+.route-shortcuts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 16px; margin-top: 12px; }
+.favorite-route, .saved-trip, .mode-toggle, .retry-button {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--white);
+  color: var(--green-deep);
+  font: 500 10px var(--mono);
+  cursor: pointer;
+}
+.favorite-route { min-height: 32px; padding: 0 10px; }
+.favorite-route[aria-pressed="true"] { border-color: #d4bd63; background: #fff8d9; color: #765e11; }
+.saved-trips { display: flex; flex: 1; flex-wrap: wrap; gap: 8px 14px; }
+.saved-trip-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.saved-trip-label { color: var(--muted); font: 9px var(--mono); }
+.saved-trip { min-height: 30px; padding: 0 8px; color: var(--ink); }
+.saved-trip:hover, .favorite-route:hover, .mode-toggle:hover, .retry-button:hover { background: #f2f4ec; }
+
 .departures-section { padding: 39px 0 0; }
 .departures-heading { display: flex; align-items: flex-end; justify-content: space-between; }
 .departures-heading h2 { margin: 9px 0 0; font-size: 23px; font-weight: 700; letter-spacing: 0; }
@@ -234,6 +251,27 @@ h1 span { color: #819253; }
   border-bottom: 1px solid var(--line);
   animation: row-in 250ms ease both;
 }
+
+.itinerary-card {
+  margin: 12px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  background: var(--white);
+  animation: row-in 250ms ease both;
+}
+.transfer-options-heading { margin: 17px 0 7px; color: var(--muted); font: 10px var(--mono); text-transform: uppercase; }
+.direct-options-heading { padding-bottom: 2px; }
+.itinerary-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.itinerary-heading strong { font-size: 13px; }
+.itinerary-heading span { color: var(--green-deep); font: 10px var(--mono); }
+.itinerary-timeline { position: relative; display: grid; gap: 0; margin-top: 12px; }
+.itinerary-stop { position: relative; display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 3px 10px; min-height: 42px; padding-left: 15px; border-left: 1px solid #9eae8b; }
+.itinerary-stop::before { position: absolute; top: 6px; left: -4px; width: 7px; height: 7px; border-radius: 50%; background: #71964a; content: ""; }
+.itinerary-stop time { grid-row: span 2; color: var(--ink); font: 600 14px var(--mono); }
+.itinerary-stop strong { font-size: 12px; }
+.itinerary-stop span { color: var(--muted); font-size: 10px; }
+.itinerary-endpoint::before { background: var(--orange); }
+.transfer-wait { display: flex; align-items: center; min-height: 30px; margin-left: 15px; padding-left: 10px; border-left: 1px dashed #c3a95f; color: #80651c; font: 9px var(--mono); }
 
 .departure-time-block { display: flex; align-items: baseline; gap: 9px; font-variant-numeric: tabular-nums; }
 .departure-time { font-size: 22px; font-weight: 700; white-space: nowrap; }
@@ -363,14 +401,43 @@ h1 span { color: #819253; }
 .empty-state span, .error-state span { display: block; }
 .error-state { display: block; padding: 45px 10px; }
 .error-state a { display: inline-block; margin-top: 10px; color: var(--green-deep); font-weight: 700; }
+.retry-button { display: block; min-height: 34px; margin: 14px auto 0; padding: 0 12px; font-size: 11px; }
 
-.board-footer { min-height: 53px; display: flex; align-items: center; justify-content: space-between; color: #848a80; font-size: 9px; }
+.board-footer { min-height: 53px; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #848a80; font-size: 9px; }
 .source-label { display: inline-flex; align-items: center; gap: 8px; color: #6c756a; }
 .source-dot { width: 6px; height: 6px; }
+.mode-toggle { min-height: 30px; padding: 0 8px; color: #687467; font-size: 9px; }
 .site-footer { display: flex; justify-content: space-between; margin-top: 24px; padding: 17px 0 24px; border-top: 1px solid var(--line); color: #858b81; font-size: 10px; }
 .site-footer > span { color: var(--green-deep); font-size: 11px; font-weight: 800; }
 .site-footer a { color: #687467; text-decoration: none; }
 .site-footer a:hover { color: var(--ink); }
+
+body.board-mode {
+  --paper: #090909;
+  --ink: #ffe29a;
+  --muted: #d2b66f;
+  --line: #62502a;
+  --green-deep: #ffe29a;
+  --white: #111;
+  background: #090909;
+  color: #ffe29a;
+}
+body.board-mode .app-shell { filter: contrast(1.16); }
+body.board-mode h1 span, body.board-mode .train-name, body.board-mode .departure-time,
+body.board-mode .arrival-time, body.board-mode .board-route { color: #ffe29a; }
+body.board-mode .route-form, body.board-mode .bus-search-form,
+body.board-mode .station-field select, body.board-mode .bus-search-field input,
+body.board-mode .subway-line-select, body.board-mode .departure-row,
+body.board-mode .itinerary-card,
+body.board-mode .favorite-route, body.board-mode .saved-trip,
+body.board-mode .mode-toggle, body.board-mode .retry-button {
+  background-color: #111;
+  color: #ffe29a;
+  border-color: #62502a;
+}
+body.board-mode .transfer-options-heading { color: #ffe29a; }
+body.board-mode .find-button, body.board-mode .network-switch[aria-current="page"] { background: #ffe29a; color: #090909; }
+body.board-mode .status-pill { background: #25200f; color: #ffe29a; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes loading { to { transform: scaleX(1.7); opacity: .45; } }
@@ -407,6 +474,10 @@ h1 span { color: #819253; }
   .swap-button { width: 38px; }
   .station-field select { height: 45px; padding-left: 10px; font-size: 16px; }
   .find-button { grid-column: 1 / -1; height: 45px; font-size: 15px; }
+  .route-shortcuts { gap: 8px; }
+  .saved-trips { flex-basis: 100%; }
+  .saved-trip-group { width: 100%; }
+  .saved-trip { font-size: 9px; }
   .subway-controls { grid-template-columns: 1fr; gap: 13px; }
   .bus-controls { grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
   .bus-controls .station-field select { height: 45px; font-size: 16px; }
@@ -418,6 +489,8 @@ h1 span { color: #819253; }
   .subway-station-field select { height: 45px; font-size: 16px; }
   .departures-section { padding-top: 32px; }
   .departure-row { grid-template-columns: 93px minmax(0, 1fr) 69px; min-height: 78px; }
+  .itinerary-card { padding: 13px 11px; }
+  .itinerary-stop { grid-template-columns: 68px minmax(0, 1fr); gap: 3px 7px; }
   .departure-time { font-size: 19px; }
   .departure-time-block { display: block; }
   .departure-relative { display: block; margin-top: 4px; }
@@ -438,6 +511,8 @@ h1 span { color: #819253; }
   .status-pill { min-height: 22px; font-size: 9px; }
   .board-meta { align-items: flex-start; flex-direction: column; justify-content: center; gap: 6px; padding: 8px 0; }
   .updated-label { font-size: 9px; }
+  .board-footer { flex-wrap: wrap; justify-content: space-between; padding: 8px 0; }
+  .board-footer .source-label { flex-basis: 100%; }
 }
 
 @media (max-width: 390px) {

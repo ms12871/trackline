@@ -95,7 +95,8 @@
 
           <div class="board-footer">
             <span class="source-label"><span class="source-dot"></span> MTA BUSTIME SIRI</span>
-            <span>REFRESHES EVERY 30 SECONDS</span>
+            <span id="refresh-countdown">NEXT UPDATE IN 30s</span>
+            <button id="board-mode-toggle" class="mode-toggle" type="button" aria-pressed="false">BOARD MODE</button>
           </div>
         </section>
       </main>
@@ -124,5 +125,6 @@
         <div class="status-block"></div>
       </article>
     </template>
+    <script type="module" src="commuter-ui.js"></script>
   </body>
 </html>

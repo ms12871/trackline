@@ -4,6 +4,10 @@ const FEED_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2F
 const SCHEDULE_URL = "./schedule.json";
 const REFRESH_INTERVAL = 30_000;
 const MAX_LOOKAHEAD = 2 * 60 * 60;
+const JAMAICA_STATION_ID = "102";
+const MANHATTAN_TERMINALS = ["237", "349"];
+const MIN_TRANSFER_SECONDS = 6 * 60;
+const MAX_TRANSFER_SECONDS = 25 * 60;
 const STATIONS = [
   ["1", "Albertson"], ["100", "Islip"], ["101", "Inwood"], ["102", "Jamaica"],
   ["107", "Kew Gardens"], ["11", "Broadway"], ["111", "Kings Park"], ["113", "Long Beach"],
@@ -55,12 +59,81 @@ const elements = {
   updated: document.querySelector("#updated-label"),
   departures: document.querySelector("#departures"),
   refresh: document.querySelector("#refresh-button"),
+  favorite: document.querySelector("#favorite-route"),
+  savedTrips: document.querySelector("#saved-trips"),
   template: document.querySelector("#departure-template")
 };
 
 const stationNames = new Map(STATIONS.map((station) => [station.id, station.name]));
 let requestNumber = 0;
 let schedulePromise;
+let renderedRouteKey = null;
+const FAVORITES_KEY = "trackline-favorite-routes";
+const RECENTS_KEY = "trackline-recent-routes";
+
+function readSavedRoutes(key) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(saved) ? saved.filter((route) => (
+      route && stationNames.has(route.from) && stationNames.has(route.to) && route.from !== route.to
+    )) : [];
+  } catch (error) {
+    console.error(`Unable to read saved trips from ${key}:`, error);
+    return [];
+  }
+}
+
+function currentRoute() {
+  return { from: elements.from.value, to: elements.to.value };
+}
+
+function routeKey(route) {
+  return `${route.from}:${route.to}`;
+}
+
+function renderSavedTrips() {
+  const favorites = readSavedRoutes(FAVORITES_KEY);
+  const recents = readSavedRoutes(RECENTS_KEY);
+  const currentKey = routeKey(currentRoute());
+  const isFavorite = favorites.some((route) => routeKey(route) === currentKey);
+  elements.favorite.setAttribute("aria-pressed", String(isFavorite));
+  elements.favorite.textContent = isFavorite ? "★ Saved trip" : "☆ Save this trip";
+
+  const fragment = document.createDocumentFragment();
+  for (const [label, routes] of [["FAVORITES", favorites], ["RECENT", recents]]) {
+    if (routes.length === 0) continue;
+    const group = document.createElement("div");
+    group.className = "saved-trip-group";
+    const heading = document.createElement("span");
+    heading.className = "saved-trip-label";
+    heading.textContent = label;
+    group.append(heading);
+    for (const route of routes) {
+      const button = document.createElement("button");
+      button.className = "saved-trip";
+      button.type = "button";
+      button.textContent = `${stationNames.get(route.from)} → ${stationNames.get(route.to)}`;
+      button.setAttribute("aria-label", `Show trains from ${stationNames.get(route.from)} to ${stationNames.get(route.to)}`);
+      button.addEventListener("click", () => {
+        elements.from.value = route.from;
+        elements.to.value = route.to;
+        loadDepartures();
+      });
+      group.append(button);
+    }
+    fragment.append(group);
+  }
+  elements.savedTrips.replaceChildren(fragment);
+  renderedRouteKey = currentKey;
+}
+
+function rememberRoute(route, key, limit) {
+  const saved = readSavedRoutes(key);
+  if (saved[0] && routeKey(saved[0]) === routeKey(route)) return;
+  const filtered = saved.filter((item) => routeKey(item) !== routeKey(route));
+  filtered.unshift(route);
+  localStorage.setItem(key, JSON.stringify(filtered.slice(0, limit)));
+}
 
 function populateStations() {
   const savedFrom = localStorage.getItem("trackline-from") || "237";
@@ -103,17 +176,24 @@ function timestampSeconds(value) {
 
 function getTrackNumber(stopUpdate) {
   const stopProperties = stopUpdate.stopTimeProperties || stopUpdate.stop_time_properties || {};
-  const fields = ["trackNumber", "track_number", "track", "platformNumber", "platform_number", "platform"];
+  const containers = [stopUpdate, stopProperties, stopUpdate.arrival, stopUpdate.departure];
+  const fields = [
+    "trackNumber", "track_number", "track", "trackId", "track_id", "assignedTrack", "assigned_track",
+    "platformNumber", "platform_number", "platform", "platformId", "platform_id",
+    "assignedPlatform", "assigned_platform"
+  ];
 
-  for (const field of fields) {
-    const value = stopUpdate[field] ?? stopProperties[field];
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
-    if (typeof value !== "string") continue;
+  for (const container of containers) {
+    for (const field of fields) {
+      const value = container?.[field];
+      if (typeof value === "number" && Number.isFinite(value)) return String(value);
+      if (typeof value !== "string") continue;
 
-    const text = value.trim();
-    const labeledTrack = text.match(/^(?:track|platform)\s*([a-z0-9-]+)$/i);
-    if (labeledTrack) return labeledTrack[1];
-    if (/^(?:[a-z]?\d+[a-z]?)$/i.test(text)) return text;
+      const text = value.trim();
+      const labeledTrack = text.match(/^(?:track|platform)\s*:?\s*([a-z0-9-]+)$/i);
+      if (labeledTrack) return labeledTrack[1];
+      if (/^(?:[a-z]?\d+[a-z]?)$/i.test(text)) return text;
+    }
   }
 
   return null;
@@ -257,6 +337,142 @@ function getRouteTrips(feed, fromId, toId) {
   return results.sort((first, second) => first.departure - second.departure).slice(0, 8);
 }
 
+function matchTransferLegs(firstLegs, secondLegs, toId) {
+  const itineraries = [];
+  for (const firstLeg of firstLegs) {
+    const connections = secondLegs.filter((secondLeg) => {
+      const transferTime = secondLeg.departure - firstLeg.arrival;
+      return secondLeg.id !== firstLeg.id
+        && transferTime >= MIN_TRANSFER_SECONDS
+        && transferTime <= MAX_TRANSFER_SECONDS;
+    }).sort((first, second) => first.arrival - second.arrival);
+    if (connections.length === 0) continue;
+    itineraries.push({
+      departure: firstLeg.departure,
+      arrival: connections[0].arrival,
+      firstLeg,
+      secondLeg: connections[0],
+      layover: connections[0].departure - firstLeg.arrival,
+      destinationId: toId
+    });
+  }
+
+  const uniqueItineraries = new Map();
+  for (const itinerary of itineraries.sort((first, second) => first.departure - second.departure)) {
+    if (!uniqueItineraries.has(itinerary.firstLeg.id)) {
+      uniqueItineraries.set(itinerary.firstLeg.id, itinerary);
+    }
+  }
+  return [...uniqueItineraries.values()].slice(0, 8);
+}
+
+function getTransferTrips(feed, fromId, toId) {
+  const nowSeconds = Date.now() / 1000;
+  const firstLegs = [];
+  const secondLegs = [];
+
+  for (const entity of feed.entity || []) {
+    const update = entity.tripUpdate;
+    if (!update || update.trip?.scheduleRelationship === 3) continue;
+
+    const stops = update.stopTimeUpdate || [];
+    const tripId = update.trip?.tripId || entity.id;
+    const route = update.trip?.routeId || "LIRR";
+    const originIndex = stops.findIndex((stop) => String(stop.stopId) === fromId);
+    const destinationIndex = stops.findIndex((stop) => String(stop.stopId) === toId);
+    const jamaicaIndex = stops.findIndex((stop) => String(stop.stopId) === JAMAICA_STATION_ID);
+
+    if (originIndex >= 0 && jamaicaIndex > originIndex) {
+      const originStop = stops[originIndex];
+      const jamaicaStop = stops[jamaicaIndex];
+      const departure = timestampSeconds(originStop.departure?.time ?? originStop.arrival?.time);
+      const arrival = timestampSeconds(jamaicaStop.arrival?.time ?? jamaicaStop.departure?.time);
+      if (Number.isFinite(departure) && Number.isFinite(arrival)
+        && departure >= nowSeconds - 90 && departure <= nowSeconds + MAX_LOOKAHEAD
+        && arrival > departure) {
+        firstLegs.push({
+          id: tripId,
+          route,
+          departure,
+          arrival,
+          departureTrack: getTrackNumber(originStop),
+          arrivalTrack: getTrackNumber(jamaicaStop)
+        });
+      }
+    }
+
+    if (jamaicaIndex >= 0 && destinationIndex > jamaicaIndex) {
+      const jamaicaStop = stops[jamaicaIndex];
+      const destinationStop = stops[destinationIndex];
+      const departure = timestampSeconds(jamaicaStop.departure?.time ?? jamaicaStop.arrival?.time);
+      const arrival = timestampSeconds(destinationStop.arrival?.time ?? destinationStop.departure?.time);
+      if (Number.isFinite(departure) && Number.isFinite(arrival)
+        && departure <= nowSeconds + MAX_LOOKAHEAD && arrival > departure) {
+        secondLegs.push({
+          id: tripId,
+          route,
+          departure,
+          arrival,
+          departureTrack: getTrackNumber(jamaicaStop),
+          arrivalTrack: getTrackNumber(destinationStop)
+        });
+      }
+    }
+  }
+
+  return matchTransferLegs(firstLegs, secondLegs, toId);
+}
+
+function getScheduledTransferTrips(schedule, fromId, toId) {
+  const nowSeconds = Date.now() / 1000;
+  const firstLegs = [];
+  const secondLegs = [];
+  const today = currentServiceDate();
+
+  for (const [serviceDate, serviceIds] of Object.entries(schedule.servicesByDate || {})) {
+    if (serviceDate < today) continue;
+    const activeServices = new Set(serviceIds);
+    for (const [tripId, routeId, serviceId, stops] of schedule.trips || []) {
+      if (!activeServices.has(serviceId)) continue;
+      const jamaicaIndex = stops.findIndex((stop) => String(stop[0]) === JAMAICA_STATION_ID);
+      if (jamaicaIndex < 0) continue;
+      const originIndex = stops.findIndex((stop, index) => index < jamaicaIndex && String(stop[0]) === fromId);
+      if (originIndex >= 0) {
+        const departure = scheduledTimestamp(serviceDate, stops[originIndex][2] || stops[originIndex][1]);
+        const arrival = scheduledTimestamp(serviceDate, stops[jamaicaIndex][1] || stops[jamaicaIndex][2]);
+        if (Number.isFinite(departure) && Number.isFinite(arrival)
+          && departure >= nowSeconds && departure <= nowSeconds + MAX_LOOKAHEAD && arrival > departure) {
+          firstLegs.push({
+            id: tripId,
+            route: routeId || "LIRR",
+            departure,
+            arrival,
+            scheduled: true
+          });
+        }
+      }
+
+      const destinationIndex = stops.findIndex((stop, index) => index > jamaicaIndex && String(stop[0]) === toId);
+      if (destinationIndex > jamaicaIndex) {
+        const departure = scheduledTimestamp(serviceDate, stops[jamaicaIndex][2] || stops[jamaicaIndex][1]);
+        const arrival = scheduledTimestamp(serviceDate, stops[destinationIndex][1] || stops[destinationIndex][2]);
+        if (Number.isFinite(departure) && Number.isFinite(arrival)
+          && departure >= nowSeconds && departure <= nowSeconds + MAX_LOOKAHEAD && arrival > departure) {
+          secondLegs.push({
+            id: tripId,
+            route: routeId || "LIRR",
+            departure,
+            arrival,
+            scheduled: true
+          });
+        }
+      }
+    }
+  }
+
+  return matchTransferLegs(firstLegs, secondLegs, toId);
+}
+
 function showMessage(kind, heading, message, linkLabel, linkHref) {
   const state = document.createElement("div");
   state.className = `${kind}-state`;
@@ -275,7 +491,92 @@ function showMessage(kind, heading, message, linkLabel, linkHref) {
     state.append(link);
   }
 
+  if (kind === "error") {
+    const retry = document.createElement("button");
+    retry.className = "retry-button";
+    retry.type = "button";
+    retry.textContent = "Try again";
+    retry.addEventListener("click", () => elements.refresh.click());
+    state.append(retry);
+  }
+
   elements.departures.replaceChildren(state);
+}
+
+function appendItineraryStop(timeline, timestamp, station, detail, endpoint = false) {
+  const stop = document.createElement("div");
+  stop.className = `itinerary-stop${endpoint ? " itinerary-endpoint" : ""}`;
+  const time = document.createElement("time");
+  time.dateTime = new Date(timestamp * 1000).toISOString();
+  time.textContent = formatTime(timestamp);
+  const name = document.createElement("strong");
+  name.textContent = station;
+  const description = document.createElement("span");
+  description.textContent = detail;
+  stop.append(time, name, description);
+  timeline.append(stop);
+}
+
+function renderTransferDepartures(itineraries, append = false) {
+  if (itineraries.length === 0) return false;
+
+  const fragment = document.createDocumentFragment();
+  const groups = new Map();
+  for (const itinerary of itineraries) {
+    if (!groups.has(itinerary.destinationId)) groups.set(itinerary.destinationId, []);
+    groups.get(itinerary.destinationId).push(itinerary);
+  }
+
+  for (const [destinationId, group] of groups) {
+    const section = document.createElement("section");
+    section.className = "transfer-options";
+    const sectionHeading = document.createElement("h3");
+    sectionHeading.className = "transfer-options-heading";
+    sectionHeading.textContent = destinationId === elements.to.value
+      ? `Transfer options to ${stationNames.get(destinationId)}`
+      : `Alternative transfer to ${stationNames.get(destinationId)}`;
+    section.append(sectionHeading);
+
+    for (const [index, itinerary] of group.entries()) {
+      const { firstLeg, secondLeg, layover } = itinerary;
+      const card = document.createElement("article");
+      card.className = "itinerary-card";
+      card.style.animationDelay = `${index * 45}ms`;
+
+      const heading = document.createElement("div");
+      heading.className = "itinerary-heading";
+      const title = document.createElement("strong");
+      title.textContent = `${stationNames.get(elements.from.value)} → ${stationNames.get(destinationId)}`;
+      const summary = document.createElement("span");
+      const totalMinutes = Math.round((itinerary.arrival - itinerary.departure) / 60);
+      summary.textContent = `${totalMinutes} min · 1 transfer at Jamaica`;
+      heading.append(title, summary);
+
+      const timeline = document.createElement("div");
+      timeline.className = "itinerary-timeline";
+      const trackDetail = (track, event, scheduled) => {
+        if (track) return `${event} · Track ${track}`;
+        return scheduled ? `${event} · Track unavailable on timetable` : `${event} · Track not posted`;
+      };
+      appendItineraryStop(timeline, firstLeg.departure, stationNames.get(elements.from.value), trackDetail(firstLeg.departureTrack, "Departs", firstLeg.scheduled), true);
+      appendItineraryStop(timeline, firstLeg.arrival, "Jamaica", trackDetail(firstLeg.arrivalTrack, "Arrives", firstLeg.scheduled));
+
+      const transfer = document.createElement("div");
+      transfer.className = "transfer-wait";
+      transfer.textContent = `${Math.round(layover / 60)} MIN TRANSFER`;
+      timeline.append(transfer);
+
+      appendItineraryStop(timeline, secondLeg.departure, "Jamaica", trackDetail(secondLeg.departureTrack, "Departs", secondLeg.scheduled));
+      appendItineraryStop(timeline, secondLeg.arrival, stationNames.get(destinationId), trackDetail(secondLeg.arrivalTrack, "Arrives", secondLeg.scheduled), true);
+      card.append(heading, timeline);
+      section.append(card);
+    }
+    fragment.append(section);
+  }
+
+  if (append) elements.departures.append(fragment);
+  else elements.departures.replaceChildren(fragment);
+  return true;
 }
 
 function renderDepartures(trips, scheduled = false) {
@@ -294,15 +595,17 @@ function renderDepartures(trips, scheduled = false) {
     row.querySelector(".departure-time").dateTime = new Date(trip.departure * 1000).toISOString();
     row.querySelector(".departure-relative").textContent = relativeDeparture(trip.departure, nowSeconds);
     row.querySelector(".train-name").textContent = trip.route === "LIRR" ? "Long Island Rail Road" : `LIRR · ${trip.route}`;
-    row.querySelector(".train-summary").textContent = `Train ${trip.id}`;
+    row.querySelector(".train-summary").textContent = scheduled ? "Scheduled service" : "Live service";
     const trackInfo = row.querySelector(".track-info");
     const trackDetails = [];
-    if (trip.departureTrack) trackDetails.push(`Departs on track ${trip.departureTrack}`);
-    if (trip.arrivalTrack) trackDetails.push(`Arrives on track ${trip.arrivalTrack}`);
-    if (trackDetails.length > 0) {
-      trackInfo.textContent = trackDetails.join(" · ");
-      trackInfo.hidden = false;
-    }
+    trackDetails.push(trip.departureTrack
+      ? `Departs on track ${trip.departureTrack}`
+      : scheduled ? "Departure track unavailable on timetable" : "Departure track not posted");
+    trackDetails.push(trip.arrivalTrack
+      ? `Arrives on track ${trip.arrivalTrack}`
+      : scheduled ? "Arrival track unavailable on timetable" : "Arrival track not posted");
+    trackInfo.textContent = trackDetails.join(" · ");
+    trackInfo.hidden = false;
     row.querySelector(".arrival-time").textContent = formatTime(trip.arrival);
     row.querySelector(".arrival-time").dateTime = new Date(trip.arrival * 1000).toISOString();
 
@@ -333,6 +636,7 @@ function renderDepartures(trips, scheduled = false) {
 function updateRouteLabels() {
   elements.originLabel.textContent = stationNames.get(elements.from.value);
   elements.destinationLabel.textContent = stationNames.get(elements.to.value);
+  if (routeKey(currentRoute()) !== renderedRouteKey) renderSavedTrips();
   elements.routeError.hidden = true;
 }
 
@@ -347,6 +651,7 @@ async function loadDepartures() {
 
   localStorage.setItem("trackline-from", fromId);
   localStorage.setItem("trackline-to", toId);
+  rememberRoute({ from: fromId, to: toId }, RECENTS_KEY, 5);
   updateRouteLabels();
 
   const thisRequest = ++requestNumber;
@@ -370,11 +675,51 @@ async function loadDepartures() {
     if (thisRequest !== requestNumber) return;
 
     const realtimeTrips = getRouteTrips(feed, fromId, toId);
-    if (realtimeTrips.length > 0) {
-      renderDepartures(realtimeTrips);
-    } else {
+    const transferDestinations = MANHATTAN_TERMINALS.includes(toId)
+      ? MANHATTAN_TERMINALS.filter((terminalId) => terminalId !== fromId)
+      : [toId];
+    const transferTrips = [];
+    const hasDirectTrips = realtimeTrips.length > 0;
+    if (hasDirectTrips) renderDepartures(realtimeTrips);
+
+    let scheduleData;
+    for (const destinationId of transferDestinations) {
+      const liveTrips = getTransferTrips(feed, fromId, destinationId);
+      if (liveTrips.length > 0) {
+        transferTrips.push(...liveTrips);
+        continue;
+      }
+
       try {
-        const scheduledTrip = getNextScheduledTrip(await loadSchedule(), fromId, toId);
+        scheduleData ||= await loadSchedule();
+        transferTrips.push(...getScheduledTransferTrips(scheduleData, fromId, destinationId));
+      } catch (scheduleError) {
+        console.error(`Unable to load scheduled transfer options to ${stationNames.get(destinationId)}:`, scheduleError);
+      }
+    }
+    if (thisRequest !== requestNumber) return;
+    const hasTransferTrips = transferTrips.length > 0;
+    const hasLiveTransferTrips = transferTrips.some((itinerary) => (
+      !itinerary.firstLeg.scheduled && !itinerary.secondLeg.scheduled
+    ));
+    const hasScheduledTransferTrips = transferTrips.some((itinerary) => (
+      itinerary.firstLeg.scheduled || itinerary.secondLeg.scheduled
+    ));
+
+    if (hasTransferTrips) {
+      if (hasDirectTrips) {
+        const directHeading = document.createElement("h3");
+        directHeading.className = "transfer-options-heading direct-options-heading";
+        directHeading.textContent = "Direct trains";
+        elements.departures.prepend(directHeading);
+      }
+      renderTransferDepartures(transferTrips, hasDirectTrips);
+    }
+
+    if (!hasDirectTrips && !hasTransferTrips) {
+      try {
+        const scheduledTrip = getNextScheduledTrip(scheduleData || await loadSchedule(), fromId, toId);
+        if (thisRequest !== requestNumber) return;
         if (scheduledTrip) {
           renderDepartures([scheduledTrip], true);
           elements.updated.textContent = "NEXT SCHEDULED DEPARTURE · NO LIVE TRAINS";
@@ -387,7 +732,17 @@ async function loadDepartures() {
       }
     }
     elements.connection.textContent = "LIVE FEED";
-    if (realtimeTrips.length > 0) {
+    if (hasDirectTrips && hasTransferTrips) {
+      elements.updated.textContent = hasLiveTransferTrips && hasScheduledTransferTrips
+        ? "LIVE DIRECT TRAINS · LIVE AND TIMETABLE TRANSFERS"
+        : hasScheduledTransferTrips
+          ? "LIVE DIRECT TRAINS · TIMETABLE TRANSFERS AVAILABLE"
+          : "LIVE DIRECT TRAINS · TRANSFER OPTIONS AVAILABLE";
+    } else if (hasTransferTrips) {
+      elements.updated.textContent = hasLiveTransferTrips
+        ? "LIVE CONNECTIONS · TRANSFER AT JAMAICA"
+        : "SCHEDULED CONNECTIONS · TRANSFER AT JAMAICA";
+    } else if (hasDirectTrips) {
       elements.updated.textContent = `UPDATED ${new Intl.DateTimeFormat("en-US", {
         timeZone: "America/New_York",
         hour: "numeric",
@@ -419,10 +774,22 @@ elements.form.addEventListener("submit", (event) => {
   loadDepartures();
 });
 elements.refresh.addEventListener("click", loadDepartures);
+elements.favorite.addEventListener("click", () => {
+  const route = currentRoute();
+  if (route.from === route.to) return;
+  const favorites = readSavedRoutes(FAVORITES_KEY);
+  const matchingRoute = favorites.find((item) => routeKey(item) === routeKey(route));
+  const updated = matchingRoute
+    ? favorites.filter((item) => routeKey(item) !== routeKey(route))
+    : [route, ...favorites].slice(0, 8);
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+  renderSavedTrips();
+});
 elements.swap.addEventListener("click", () => {
   const previousFrom = elements.from.value;
   elements.from.value = elements.to.value;
   elements.to.value = previousFrom;
+  renderSavedTrips();
   loadDepartures();
 });
 

@@ -197,7 +197,7 @@ function getArrivals(feed, line, station) {
   return [...uniqueArrivals.values()].slice(0, 8);
 }
 
-function showMessage(className, headingText, messageText, linkText, linkHref) {
+function showMessage(className, headingText, messageText, linkText, linkHref, retryAction = () => elements.refresh.click()) {
   const state = document.createElement("div");
   state.className = className;
   const heading = document.createElement("strong");
@@ -213,6 +213,15 @@ function showMessage(className, headingText, messageText, linkText, linkHref) {
     link.rel = "noreferrer";
     link.textContent = linkText;
     state.append(link);
+  }
+
+  if (className === "error-state") {
+    const retry = document.createElement("button");
+    retry.className = "retry-button";
+    retry.type = "button";
+    retry.textContent = "Try again";
+    retry.addEventListener("click", retryAction);
+    state.append(retry);
   }
 
   elements.arrivals.replaceChildren(state);
@@ -348,7 +357,7 @@ async function initialize() {
     console.error("Unable to load subway stations:", error);
     elements.connection.textContent = "STATIONS UNAVAILABLE";
     elements.updated.textContent = "STATION DATA UNAVAILABLE";
-    showMessage("error-state", "Could not load subway stations", "Refresh the page to try again.");
+    showMessage("error-state", "Could not load subway stations", "Refresh the page to try again.", null, null, () => location.reload());
     elements.arrivals.setAttribute("aria-busy", "false");
   }
 }

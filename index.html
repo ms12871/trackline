@@ -62,6 +62,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
             </button>
           </form>
+          <div class="route-shortcuts">
+            <button id="favorite-route" class="favorite-route" type="button" aria-pressed="false">☆ Save this trip</button>
+            <div id="saved-trips" class="saved-trips" aria-label="Favorite and recent trips"></div>
+          </div>
           <div id="route-error" class="route-error" role="alert" hidden></div>
         </section>
 
@@ -87,7 +91,8 @@
 
           <div class="board-footer">
             <span class="source-label"><span class="source-dot"></span> MTA GTFS-REALTIME</span>
-            <span id="refresh-note">UPDATES EVERY 30 SECONDS</span>
+            <span id="refresh-countdown">NEXT UPDATE IN 30s</span>
+            <button id="board-mode-toggle" class="mode-toggle" type="button" aria-pressed="false">BOARD MODE</button>
           </div>
         </section>
       </main>
@@ -116,5 +121,6 @@
         <div class="status-block"></div>
       </article>
     </template>
+    <script type="module" src="commuter-ui.js"></script>
   </body>
 </html>
