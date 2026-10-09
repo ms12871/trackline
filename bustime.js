@@ -28,7 +28,7 @@ let selectedStop = null;
 let requestNumber = 0;
 
 function routeCode(route) {
-  return String(route.id || "").replace(/^MTA\s+[^_]+_/, "");
+  return String(route.id || "").replace(/^MTA\s+[^_]+_/, "").replace(/^MTABC_/, "");
 }
 
 function updateClock() {
@@ -102,18 +102,40 @@ function showMessage(className, titleText, messageText, linkText, linkHref) {
 async function enrichRoute(route) {
   if (Array.isArray(route.directions) && route.directions.every((direction) => Array.isArray(direction.stops))) return route;
 
-  const directions = await Promise.all(["0", "1"].map(async (directionId) => {
-    const response = await fetchApi("stops-on-route-for-direction", { routeId: route.id, directionId });
-    const stops = response.stops || [];
-    return {
-      directionId,
-      destination: stops.at(-1)?.name || stops[0]?.name || `Direction ${directionId}`,
-      stops
-    };
+  const directionResults = await Promise.all(["0", "1"].map(async (directionId) => {
+    try {
+      const response = await fetchApi("stops-on-route-for-direction", { routeId: route.id, directionId });
+      const stops = response.stops || [];
+      return {
+        directionId,
+        destination: stops.at(-1)?.name || stops[0]?.name || `Direction ${directionId}`,
+        stops
+      };
+    } catch {
+      return null;
+    }
   }));
-  const activeDirections = directions.filter((direction) => direction.stops.length > 0);
+  const activeDirections = directionResults.filter((direction) => direction?.stops.length > 0);
   if (activeDirections.length === 0) throw new Error("BusTime has no stop list for this route.");
   return { ...route, directions: activeDirections };
+}
+
+async function findDirectRoute(query) {
+  const normalized = query.trim().toUpperCase().replace(/\s+/g, "");
+  const routeIds = /^(?:MTA\s+NYCT_|MTABC_)/.test(query)
+    ? [query.trim()]
+    : [`MTA NYCT_${normalized}`, `MTABC_${normalized}`];
+
+  for (const id of routeIds) {
+    try {
+      const route = await enrichRoute({ id });
+      return { ...route, shortName: routeCode(route) };
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 function updateBoardLabels() {
@@ -181,11 +203,18 @@ async function searchRoutes(query) {
       suggestions = (results?.suggestions || []).filter((suggestion) => suggestion.type === 3);
       firstRoute = results?.firstSuggestion;
     }
-    if (firstRoute?.id && Array.isArray(firstRoute.directions)) routeOptions.set(firstRoute.id, firstRoute);
+    if (firstRoute?.type !== 3) firstRoute = null;
 
     if (suggestions.length === 0 && firstRoute?.id) suggestions.push(firstRoute);
+    if (suggestions.length === 0) {
+      const directRoute = await findDirectRoute(searchText);
+      if (directRoute) {
+        firstRoute = directRoute;
+        suggestions.push(directRoute);
+      }
+    }
     const uniqueSuggestions = [...new Map(suggestions.map((suggestion) => [suggestion.id, suggestion])).values()];
-    if (uniqueSuggestions.length === 0) throw new Error("No bus routes found. Try a route such as M15, B63, or Q60.");
+    if (uniqueSuggestions.length === 0) throw new Error("No live bus route found. Try Q1, Q60, M15, or B63.");
 
     routeOptions = new Map();
     if (firstRoute?.id && Array.isArray(firstRoute.directions)) routeOptions.set(firstRoute.id, firstRoute);
