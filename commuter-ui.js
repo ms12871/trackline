@@ -2,20 +2,27 @@ const REFRESH_INTERVAL = 30_000;
 const countdown = document.querySelector("#refresh-countdown");
 const refresh = document.querySelector("#refresh-button");
 const progress = document.querySelector("#refresh-progress");
-const boardMode = document.querySelector("#board-mode-toggle");
+const themeToggle = document.querySelector("#theme-toggle");
 let refreshStarted = Date.now();
 
-function setBoardMode(enabled) {
-  document.body.classList.toggle("board-mode", enabled);
-  boardMode.setAttribute("aria-pressed", String(enabled));
-  boardMode.textContent = enabled ? "STANDARD MODE" : "BOARD MODE";
-  localStorage.setItem("trackline-board-mode", enabled ? "on" : "off");
+function setTheme(theme) {
+  const isDark = theme === "dark";
+  document.body.classList.toggle("dark-mode", isDark);
+  themeToggle.setAttribute("aria-pressed", String(isDark));
+  themeToggle.textContent = isDark ? "DARK MODE" : "STANDARD MODE";
+  themeToggle.setAttribute("aria-label", `Switch to ${isDark ? "Standard" : "Dark"} mode`);
+  localStorage.setItem("trackline-theme", isDark ? "dark" : "standard");
+  localStorage.setItem("trackline-board-mode", isDark ? "on" : "off");
 }
 
-if (boardMode) {
-  setBoardMode(localStorage.getItem("trackline-board-mode") === "on");
-  boardMode.addEventListener("click", () => {
-    setBoardMode(!document.body.classList.contains("board-mode"));
+if (themeToggle) {
+  const savedTheme = localStorage.getItem("trackline-theme");
+  const isDark = savedTheme
+    ? savedTheme === "dark"
+    : localStorage.getItem("trackline-board-mode") === "on";
+  setTheme(isDark ? "dark" : "standard");
+  themeToggle.addEventListener("click", () => {
+    setTheme(document.body.classList.contains("dark-mode") ? "standard" : "dark");
   });
 }
 

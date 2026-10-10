@@ -530,32 +530,85 @@ h1 span { color: #819253; }
 .site-footer a { color: #687467; text-decoration: none; }
 .site-footer a:hover { color: var(--ink); }
 
-body.board-mode {
-  --paper: #090909;
-  --ink: #ffe29a;
-  --muted: #d2b66f;
-  --line: #62502a;
-  --green-deep: #ffe29a;
-  --white: #111;
-  background: #090909;
-  color: #ffe29a;
+body.dark-mode {
+  color-scheme: dark;
+  --paper: #111713;
+  --ink: #e8eee5;
+  --muted: #a8b2a5;
+  --line: #39443b;
+  --green-deep: #b9dc8f;
+  --white: #1b241d;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(138deg, rgba(255, 255, 255, .025) 0%, transparent 48%),
+    linear-gradient(312deg, rgba(115, 148, 73, .06) 0%, transparent 46%),
+    repeating-linear-gradient(0deg, transparent 0 35px, rgba(232, 238, 229, .012) 35px 36px),
+    repeating-linear-gradient(90deg, transparent 0 35px, rgba(232, 238, 229, .008) 35px 36px);
 }
-body.board-mode .app-shell { filter: contrast(1.16); }
-body.board-mode h1 span, body.board-mode .train-name, body.board-mode .departure-time,
-body.board-mode .arrival-time, body.board-mode .board-route { color: #ffe29a; }
-body.board-mode .route-form, body.board-mode .bus-search-form,
-body.board-mode .station-field select, body.board-mode .bus-search-field input,
-body.board-mode .subway-line-select, body.board-mode .departure-row,
-body.board-mode .itinerary-card,
-body.board-mode .favorite-route, body.board-mode .saved-trip,
-body.board-mode .mode-toggle, body.board-mode .retry-button {
-  background-color: #111;
-  color: #ffe29a;
-  border-color: #62502a;
+body.dark-mode h1 span { color: #b9d493; }
+body.dark-mode .intro-copy, body.dark-mode .swap-button,
+body.dark-mode .departure-relative, body.dark-mode .train-summary,
+body.dark-mode .arrival-label, body.dark-mode .event-label,
+body.dark-mode .train-direction, body.dark-mode .train-id,
+body.dark-mode .site-footer a { color: #a8b2a5; }
+body.dark-mode .route-form, body.dark-mode .bus-search-form {
+  border-color: var(--line);
+  box-shadow: 0 7px 22px #0004;
 }
-body.board-mode .transfer-options-heading { color: #ffe29a; }
-body.board-mode .find-button, body.board-mode .network-switch[aria-current="page"] { background: #ffe29a; color: #090909; }
-body.board-mode .status-pill { background: #25200f; color: #ffe29a; }
+body.dark-mode .station-field select, body.dark-mode .bus-search-field input,
+body.dark-mode .subway-search-field input, body.dark-mode .subway-line-select {
+  border-color: #465247;
+  background-color: #151d17;
+  color: var(--ink);
+}
+body.dark-mode .station-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8b2a5' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+body.dark-mode .swap-button:hover, body.dark-mode .icon-button:hover,
+body.dark-mode .saved-trip:hover, body.dark-mode .favorite-route:hover,
+body.dark-mode .mode-toggle:hover, body.dark-mode .retry-button:hover,
+body.dark-mode .station-search-result:hover, body.dark-mode .station-search-result:focus-visible,
+body.dark-mode .station-search-result[aria-selected="true"],
+body.dark-mode .station-shortcut:hover { background: #28332a; }
+body.dark-mode .find-button { background: #b9dc8f; color: #172117; }
+body.dark-mode .find-button:hover { background: #c9e8a0; }
+body.dark-mode .favorite-route[aria-pressed="true"] {
+  border-color: #80713c;
+  background: #302b19;
+  color: #e5d28c;
+}
+body.dark-mode .service-alert {
+  border-color: #806936;
+  background: #302a18;
+  color: #f0d993;
+}
+body.dark-mode .service-alert-critical {
+  border-color: #865248;
+  background: #321f1c;
+  color: #f0b7a9;
+}
+body.dark-mode .service-alert-status { background: #151d17; }
+body.dark-mode .offline-warning {
+  border-color: #865248;
+  background: #321f1c;
+  color: #f0b7a9;
+}
+body.dark-mode .status-pill { background: #293522; color: #c3e29c; }
+body.dark-mode .status-pill.scheduled, body.dark-mode .status-pill.unknown {
+  background: #252d27;
+  color: #c0c9bd;
+}
+body.dark-mode .status-pill.delayed {
+  background: #38231f;
+  color: #f0b7a9;
+}
+body.dark-mode .service-type { background: #293522; color: #c3e29c; }
+body.dark-mode .service-type.express { background: #222c3c; color: #b8d2f5; }
+body.dark-mode .transfer-wait { color: #e2cb83; }
+body.dark-mode .route-error, body.dark-mode .discovery-status { color: #f0b7a9; }
+body.dark-mode .itinerary-stop { border-left-color: #627653; }
+body.dark-mode .site-footer > span { color: #b9dc8f; }
+body.dark-mode .site-footer a:hover { color: var(--ink); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes loading { to { transform: scaleX(1.7); opacity: .45; } }
