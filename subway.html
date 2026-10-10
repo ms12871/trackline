@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="style.css">
     <script type="module" src="subway.js"></script>
   </head>
-  <body>
+  <body class="subway-page">
     <div class="app-shell">
       <header class="topbar">
         <a class="wordmark" href="./" aria-label="Trackline home">
@@ -45,6 +45,24 @@
             </div>
           </div>
 
+          <div class="subway-discovery">
+            <label class="station-field subway-search-field" for="station-search">
+              <span class="field-label"><span class="station-marker origin-marker"></span> FIND A STATION</span>
+              <input id="station-search" type="search" role="combobox" placeholder="Station, cross street, or landmark" autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="station-search-results">
+            </label>
+            <div id="station-search-results" class="station-search-results" role="listbox" aria-label="Station search results" hidden></div>
+            <button id="nearest-stations" class="find-button nearest-button" type="button">
+              <span>Find stations near me</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>
+            </button>
+          </div>
+          <div id="station-search-status" class="discovery-status" role="status" aria-live="polite"></div>
+
+          <div class="line-selector">
+            <span class="field-label"><span class="station-marker origin-marker"></span> QUICK LINE PICK</span>
+            <div id="line-chips" class="line-chips" role="group" aria-label="Choose a subway line"></div>
+          </div>
+
           <div class="subway-controls">
             <label class="station-field subway-line-field">
               <span class="field-label"><span class="station-marker origin-marker"></span> LINE</span>
@@ -57,6 +75,13 @@
               <span class="field-label"><span class="station-marker origin-marker"></span> STATION</span>
               <select id="station-select" aria-label="Subway station" disabled></select>
             </label>
+          </div>
+          <div class="subway-shortcuts">
+              <div>
+                <span class="field-label"><span class="station-marker origin-marker"></span> PINNED & RECENT</span>
+                <div id="station-shortcuts" class="station-shortcuts"></div>
+              </div>
+              <button id="pin-station" class="favorite-route" type="button" aria-pressed="false">☆ PIN THIS STOP</button>
           </div>
           <div id="subway-error" class="route-error" role="alert" hidden></div>
         </section>
@@ -77,12 +102,20 @@
             <span id="updated-label" class="updated-label">WAITING FOR LIVE DATA</span>
           </div>
 
+          <div id="service-alerts" class="service-alerts" role="region" aria-label="Live subway service updates" hidden></div>
+          <div id="offline-warning" class="offline-warning" role="status" aria-live="polite" hidden></div>
+          <div class="direction-tabs" role="group" aria-label="Arrival direction">
+            <button class="direction-tab" type="button" data-direction="N" aria-pressed="true">Uptown / Northbound</button>
+            <button class="direction-tab" type="button" data-direction="S" aria-pressed="false">Downtown / Southbound</button>
+          </div>
+
           <div id="arrivals" class="departures-list" aria-live="polite" aria-busy="true">
             <div class="loading-state"><span class="loading-bar"></span><span>Connecting to MTA subway feed</span></div>
           </div>
 
           <div class="board-footer">
             <span class="source-label"><span class="source-dot"></span> MTA GTFS-REALTIME</span>
+            <span id="refresh-progress" class="refresh-progress" aria-hidden="true"></span>
             <span id="refresh-countdown">NEXT UPDATE IN 30s</span>
             <button id="board-mode-toggle" class="mode-toggle" type="button" aria-pressed="false">BOARD MODE</button>
           </div>
@@ -99,20 +132,27 @@
       <article class="departure-row subway-arrival-row">
         <div class="departure-time-block">
           <span class="event-label"></span>
-          <time class="departure-time"></time>
           <span class="departure-relative"></span>
+          <time class="departure-time"></time>
         </div>
         <div class="departure-details">
           <div class="subway-train-title"><span class="train-line-badge"></span><span class="train-name"></span></div>
           <div class="train-summary">
             <span class="train-direction"></span>
-            <span class="train-id"></span>
+            <span class="service-type"></span>
             <span class="platform-departure" hidden></span>
           </div>
         </div>
         <div class="status-block"></div>
       </article>
     </template>
+    <nav class="mobile-quick-nav" aria-label="Quick subway controls">
+      <div id="mobile-line-chips" class="line-chips" role="group" aria-label="Choose a subway line"></div>
+      <div class="mobile-direction-tabs" role="group" aria-label="Arrival direction">
+        <button class="direction-tab" type="button" data-direction="N" aria-pressed="true">Uptown / North</button>
+        <button class="direction-tab" type="button" data-direction="S" aria-pressed="false">Downtown / South</button>
+      </div>
+    </nav>
     <script type="module" src="commuter-ui.js"></script>
   </body>
 </html>

@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import math
 import urllib.request
 import zipfile
 from collections import defaultdict
@@ -53,6 +54,8 @@ def main():
                 trip_lines[trip["trip_id"]] = trip["route_id"]
 
         platforms_by_line = {route_id: defaultdict(set) for route_id in route_ids}
+        station_coordinates = {}
+        trip_station_sequences = defaultdict(list)
         for stop_time in read_table(archive, "stop_times.txt"):
             route_id = trip_lines.get(stop_time["trip_id"])
             stop = stop_by_id.get(stop_time["stop_id"])
@@ -61,18 +64,47 @@ def main():
 
             station_id = stop["parent_station"] or stop["stop_id"]
             platforms_by_line[route_id][station_id].add(stop["stop_id"])
+            sequence = trip_station_sequences[(route_id, stop_time["trip_id"])]
+            if not sequence or sequence[-1] != station_id:
+                sequence.append(station_id)
+            station = stop_by_id.get(station_id, stop)
+            latitude = float(station.get("stop_lat") or stop.get("stop_lat") or "nan")
+            longitude = float(station.get("stop_lon") or stop.get("stop_lon") or "nan")
+            if math.isfinite(latitude) and math.isfinite(longitude):
+                station_coordinates.setdefault(station_id, (latitude, longitude))
+
+    station_order_by_line = {}
+    for route_id in route_ids:
+        route_trips = (
+            sequence for (candidate_route, _), sequence in trip_station_sequences.items()
+            if candidate_route == route_id
+        )
+        longest_trip = max(route_trips, key=len, default=[])
+        station_order_by_line[route_id] = {
+            station_id: index for index, station_id in enumerate(longest_trip)
+        }
 
     stations_by_route = {}
     for route_id, stations in platforms_by_line.items():
         station_rows = []
         for station_id, platform_ids in stations.items():
             station = stop_by_id.get(station_id, {})
-            station_rows.append({
+            station_row = {
                 "id": station_id,
                 "name": station.get("stop_name") or station_id,
                 "stopIds": sorted(platform_ids),
-            })
-        stations_by_route[route_id] = sorted(station_rows, key=lambda station: station["name"].casefold())
+            }
+            if station_id in station_coordinates:
+                station_row["latitude"], station_row["longitude"] = station_coordinates[station_id]
+            station_rows.append(station_row)
+        order = station_order_by_line[route_id]
+        stations_by_route[route_id] = sorted(
+            station_rows,
+            key=lambda station: (
+                order.get(station["id"], len(order)),
+                station["name"].casefold(),
+            ),
+        )
 
     route_info = [
         {

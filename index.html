@@ -85,6 +85,7 @@
             <span id="updated-label" class="updated-label">WAITING FOR LIVE DATA</span>
           </div>
 
+          <div id="service-alerts" class="service-alerts" role="region" aria-label="Live LIRR service updates" hidden></div>
           <div id="departures" class="departures-list" aria-live="polite" aria-busy="true">
             <div class="loading-state"><span class="loading-bar"></span><span>Connecting to MTA real-time feed</span></div>
           </div>
@@ -112,7 +113,10 @@
         <div class="departure-details">
           <div class="train-name"></div>
           <div class="train-summary"></div>
-          <div class="track-info" hidden></div>
+          <div class="track-info" hidden>
+            <span class="departure-track-info"></span>
+            <span class="arrival-track-info"></span>
+          </div>
         </div>
         <div class="arrival-block">
           <span class="arrival-label">ARRIVE</span>

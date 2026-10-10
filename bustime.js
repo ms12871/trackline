@@ -1,7 +1,11 @@
+import { loadServiceAlerts } from "./service-alerts.js";
+
 const BUS_TIME_ORIGIN = "https://bustime.mta.info";
 const PUBLIC_API_KEY = "OBANYC";
 const REFRESH_INTERVAL = 30_000;
+const ALERTS_REFRESH_INTERVAL = 60_000;
 const MAX_LOOKAHEAD = 90 * 60;
+const ALERTS_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fbus-alerts";
 const elements = {
   connection: document.querySelector("#connection-label"),
   time: document.querySelector("#current-time"),
@@ -16,6 +20,7 @@ const elements = {
   stopLabel: document.querySelector("#board-stop-label"),
   updated: document.querySelector("#updated-label"),
   arrivals: document.querySelector("#bus-arrivals"),
+  alerts: document.querySelector("#service-alerts"),
   refresh: document.querySelector("#refresh-button"),
   error: document.querySelector("#bus-error"),
   template: document.querySelector("#bus-arrival-template")
@@ -26,9 +31,29 @@ let selectedRoute = null;
 let selectedDirection = null;
 let selectedStop = null;
 let requestNumber = 0;
+let routeCatalogPromise = null;
 
 function routeCode(route) {
-  return String(route.id || "").replace(/^MTA\s+[^_]+_/, "").replace(/^MTABC_/, "");
+  return String(route.shortName || route.id || "").replace(/^MTA\s+[^_]+_/, "").replace(/^MTABC_/, "");
+}
+
+function normalizeRouteCode(value) {
+  return String(value).toUpperCase().replace(/\s+/g, "").replace(/^([A-Z]+)0+(\d+)(.*)$/, "$1$2$3");
+}
+
+async function getRouteCatalog() {
+  if (!routeCatalogPromise) {
+    routeCatalogPromise = fetchApi("routes")
+      .then((response) => {
+        if (!Array.isArray(response.routes)) throw new Error("BusTime did not return its route catalog.");
+        return response.routes;
+      })
+      .catch((error) => {
+        routeCatalogPromise = null;
+        throw error;
+      });
+  }
+  return routeCatalogPromise;
 }
 
 function updateClock() {
@@ -109,7 +134,9 @@ function showMessage(className, titleText, messageText, linkText, linkHref) {
 }
 
 async function enrichRoute(route) {
-  if (Array.isArray(route.directions) && route.directions.every((direction) => Array.isArray(direction.stops))) return route;
+  if (Array.isArray(route.directions)
+    && route.directions.length > 0
+    && route.directions.every((direction) => Array.isArray(direction.stops) && direction.stops.length > 0)) return route;
 
   const directionResults = await Promise.all(["0", "1"].map(async (directionId) => {
     try {
@@ -130,21 +157,19 @@ async function enrichRoute(route) {
 }
 
 async function findDirectRoute(query) {
-  const normalized = query.trim().toUpperCase().replace(/\s+/g, "");
-  const routeIds = /^(?:MTA\s+NYCT_|MTABC_)/.test(query)
-    ? [query.trim()]
-    : [`MTA NYCT_${normalized}`, `MTABC_${normalized}`];
+  const normalized = normalizeRouteCode(query);
+  if (!/^(?:B|BX|M|Q|S|X|BM|QM|SIM)\d{1,3}(?:\+)?$/.test(normalized)) return null;
 
-  for (const id of routeIds) {
-    try {
-      const route = await enrichRoute({ id });
-      return { ...route, shortName: routeCode(route) };
-    } catch {
-      continue;
-    }
+  const route = (await getRouteCatalog())
+    .find((candidate) => normalizeRouteCode(routeCode(candidate)) === normalized);
+  if (!route) return null;
+
+  try {
+    return await enrichRoute(route);
+  } catch (error) {
+    console.error(`BusTime could not load stops for ${routeCode(route)}:`, error);
+    return { ...route, directions: [], stopsUnavailable: true };
   }
-
-  return null;
 }
 
 function updateBoardLabels() {
@@ -164,11 +189,17 @@ function populateDirections(route) {
   const directions = route.directions || [];
   fillSelect(elements.direction, directions, (direction) => direction.directionId, (direction) => direction.destination);
   selectedDirection = directions[0] || null;
-  if (!selectedDirection) {
+  if (!selectedDirection || !selectedDirection.stops?.length) {
     selectedStop = null;
     fillSelect(elements.stop, [], () => "", () => "");
     updateBoardLabels();
-    showMessage("empty-state", "No directions found", "Try another MTA bus route.");
+    showMessage(
+      "empty-state",
+      `${routeCode(route)} found · live stops unavailable`,
+      "MTA BusTime recognizes this route, but is not publishing a stop list right now. Try again later.",
+      "Open MTA BusTime",
+      "https://bustime.mta.info/"
+    );
     return;
   }
 
@@ -182,11 +213,37 @@ async function applyRoute(route) {
   elements.route.value = route.id;
   localStorage.setItem("bustime-route", route.id);
   populateDirections(route);
+  void loadBusAlerts();
 }
 
 async function loadRouteById(routeId) {
-  const route = await enrichRoute(routeOptions.get(routeId) || { id: routeId });
-  await applyRoute(route);
+  const route = routeOptions.get(routeId) || { id: routeId };
+  let resolvedRoute = route;
+
+  try {
+    resolvedRoute = await enrichRoute(route);
+  } catch (error) {
+    console.error(`BusTime could not load stops for ${routeCode(route)}:`, error);
+    resolvedRoute = { ...route, directions: [], stopsUnavailable: true };
+  }
+
+  await applyRoute(resolvedRoute);
+}
+
+function loadBusAlerts() {
+  if (!selectedRoute) return;
+  const selectedCode = normalizeRouteCode(routeCode(selectedRoute));
+  return loadServiceAlerts(elements.alerts, ALERTS_URL, {
+    matches: (alert) => {
+      const routeIds = (alert.informedEntity || []).map((entity) => entity.routeId).filter(Boolean);
+      if (routeIds.length === 0 || !selectedCode) return true;
+      return routeIds.some((routeId) => (
+        routeId === selectedRoute?.id
+        || normalizeRouteCode(routeCode({ id: routeId })) === selectedCode
+      ));
+    },
+    emptyMessage: "No active MTA bus service changes are reported for this route."
+  });
 }
 
 async function searchRoutes(query) {
@@ -203,18 +260,20 @@ async function searchRoutes(query) {
   try {
     let response = await fetchApi("search-v2", { q: searchText });
     let results = response.searchResults;
-    let suggestions = (results?.suggestions || []).filter((suggestion) => suggestion.type === 3);
+    let suggestions = [...(results?.matches || []), ...(results?.suggestions || [])]
+      .filter((suggestion) => suggestion.type === 3 && suggestion.id);
     let firstRoute = results?.firstSuggestion;
     const numericQuery = searchText.match(/\d+/)?.[0];
     if (suggestions.length === 0 && numericQuery && numericQuery !== searchText) {
       response = await fetchApi("search-v2", { q: numericQuery });
       results = response.searchResults;
-      suggestions = (results?.suggestions || []).filter((suggestion) => suggestion.type === 3);
+      suggestions = [...(results?.matches || []), ...(results?.suggestions || [])]
+        .filter((suggestion) => suggestion.type === 3 && suggestion.id);
       firstRoute = results?.firstSuggestion;
     }
     if (firstRoute?.type !== 3) firstRoute = null;
 
-    if (suggestions.length === 0 && firstRoute?.id) suggestions.push(firstRoute);
+    if (firstRoute?.id) suggestions.push(firstRoute);
     if (suggestions.length === 0) {
       const directRoute = await findDirectRoute(searchText);
       if (directRoute) {
@@ -223,7 +282,7 @@ async function searchRoutes(query) {
       }
     }
     const uniqueSuggestions = [...new Map(suggestions.map((suggestion) => [suggestion.id, suggestion])).values()];
-    if (uniqueSuggestions.length === 0) throw new Error("No live bus route found. Try Q1, Q60, M15, or B63.");
+    if (uniqueSuggestions.length === 0) throw new Error("No MTA bus route matched that search.");
 
     routeOptions = new Map();
     if (firstRoute?.id && Array.isArray(firstRoute.directions)) routeOptions.set(firstRoute.id, firstRoute);
@@ -236,8 +295,8 @@ async function searchRoutes(query) {
     });
 
     const preferredRouteId = localStorage.getItem("bustime-route");
-    const normalizedQuery = searchText.toUpperCase().replace(/\s+/g, "");
-    const matchingRoute = uniqueSuggestions.find((route) => routeCode(route).toUpperCase() === normalizedQuery);
+    const normalizedQuery = normalizeRouteCode(searchText);
+    const matchingRoute = uniqueSuggestions.find((route) => normalizeRouteCode(routeCode(route)) === normalizedQuery);
     const chosenRouteId = matchingRoute?.id || (uniqueSuggestions.some((route) => route.id === preferredRouteId)
       ? preferredRouteId
       : firstRoute?.id || uniqueSuggestions[0].id);
@@ -404,9 +463,13 @@ elements.stop.addEventListener("change", () => {
   updateBoardLabels();
   loadArrivals();
 });
-elements.refresh.addEventListener("click", loadArrivals);
+elements.refresh.addEventListener("click", () => {
+  loadArrivals();
+  void loadBusAlerts();
+});
 updateClock();
 setInterval(updateClock, 15_000);
+setInterval(() => { void loadBusAlerts(); }, ALERTS_REFRESH_INTERVAL);
 setInterval(() => {
   if (selectedStop) loadArrivals();
 }, REFRESH_INTERVAL);

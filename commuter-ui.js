@@ -1,6 +1,7 @@
 const REFRESH_INTERVAL = 30_000;
 const countdown = document.querySelector("#refresh-countdown");
 const refresh = document.querySelector("#refresh-button");
+const progress = document.querySelector("#refresh-progress");
 const boardMode = document.querySelector("#board-mode-toggle");
 let refreshStarted = Date.now();
 
@@ -26,6 +27,7 @@ if (countdown && refresh) {
     const elapsed = (Date.now() - refreshStarted) % REFRESH_INTERVAL;
     const remaining = Math.ceil((REFRESH_INTERVAL - elapsed) / 1000);
     countdown.textContent = `NEXT UPDATE IN ${remaining}s`;
+    progress?.style.setProperty("--refresh-progress", `${(elapsed / REFRESH_INTERVAL) * 100}%`);
   }, 1000);
 }
 

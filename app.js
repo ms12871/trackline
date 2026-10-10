@@ -1,6 +1,8 @@
 import bindings from "https://esm.sh/gtfs-realtime-bindings@1.1.1?bundle";
+import { loadServiceAlerts } from "./service-alerts.js";
 
 const FEED_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr";
+const ALERTS_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Flirr-alerts";
 const SCHEDULE_URL = "./schedule.json";
 const REFRESH_INTERVAL = 30_000;
 const MAX_LOOKAHEAD = 2 * 60 * 60;
@@ -58,6 +60,7 @@ const elements = {
   destinationLabel: document.querySelector("#board-destination"),
   updated: document.querySelector("#updated-label"),
   departures: document.querySelector("#departures"),
+  alerts: document.querySelector("#service-alerts"),
   refresh: document.querySelector("#refresh-button"),
   favorite: document.querySelector("#favorite-route"),
   savedTrips: document.querySelector("#saved-trips"),
@@ -176,24 +179,39 @@ function timestampSeconds(value) {
 
 function getTrackNumber(stopUpdate) {
   const stopProperties = stopUpdate.stopTimeProperties || stopUpdate.stop_time_properties || {};
-  const containers = [stopUpdate, stopProperties, stopUpdate.arrival, stopUpdate.departure];
-  const fields = [
-    "trackNumber", "track_number", "track", "trackId", "track_id", "assignedTrack", "assigned_track",
-    "platformNumber", "platform_number", "platform", "platformId", "platform_id",
-    "assignedPlatform", "assigned_platform"
+  const containers = [
+    stopUpdate,
+    stopProperties,
+    stopUpdate.extensions,
+    stopProperties.extensions,
+    stopUpdate.arrival,
+    stopUpdate.departure,
+    stopUpdate.arrival?.extensions,
+    stopUpdate.departure?.extensions
   ];
+  function findTrack(value, depth = 0, trackContext = false) {
+    if (!value || typeof value !== "object" || depth > 4) return null;
+
+    for (const [field, item] of Object.entries(value)) {
+      const isTrackField = trackContext || /track|platform/i.test(field);
+      if (typeof item === "number" && isTrackField && Number.isFinite(item)) return String(item);
+      if (typeof item === "string") {
+        const text = item.trim();
+        const labeledTrack = text.match(/^(?:track|platform)\s*(?:no\.?|number|#)?\s*:?\s*([a-z0-9-]+)$/i);
+        if (labeledTrack) return labeledTrack[1];
+        if (isTrackField && /^(?:[a-z]?\d+[a-z]?)$/i.test(text)) return text;
+      } else if (item && typeof item === "object") {
+        const nestedTrack = findTrack(item, depth + 1, isTrackField);
+        if (nestedTrack) return nestedTrack;
+      }
+    }
+
+    return null;
+  }
 
   for (const container of containers) {
-    for (const field of fields) {
-      const value = container?.[field];
-      if (typeof value === "number" && Number.isFinite(value)) return String(value);
-      if (typeof value !== "string") continue;
-
-      const text = value.trim();
-      const labeledTrack = text.match(/^(?:track|platform)\s*:?\s*([a-z0-9-]+)$/i);
-      if (labeledTrack) return labeledTrack[1];
-      if (/^(?:[a-z]?\d+[a-z]?)$/i.test(text)) return text;
-    }
+    const track = findTrack(container);
+    if (track) return track;
   }
 
   return null;
@@ -597,14 +615,12 @@ function renderDepartures(trips, scheduled = false) {
     row.querySelector(".train-name").textContent = trip.route === "LIRR" ? "Long Island Rail Road" : `LIRR · ${trip.route}`;
     row.querySelector(".train-summary").textContent = scheduled ? "Scheduled service" : "Live service";
     const trackInfo = row.querySelector(".track-info");
-    const trackDetails = [];
-    trackDetails.push(trip.departureTrack
-      ? `Departs on track ${trip.departureTrack}`
-      : scheduled ? "Departure track unavailable on timetable" : "Departure track not posted");
-    trackDetails.push(trip.arrivalTrack
-      ? `Arrives on track ${trip.arrivalTrack}`
-      : scheduled ? "Arrival track unavailable on timetable" : "Arrival track not posted");
-    trackInfo.textContent = trackDetails.join(" · ");
+    row.querySelector(".departure-track-info").textContent = trip.departureTrack
+      ? `DEP TRACK ${trip.departureTrack}`
+      : scheduled ? "DEP TRACK NOT IN TIMETABLE" : "DEP TRACK NOT POSTED BY MTA";
+    row.querySelector(".arrival-track-info").textContent = trip.arrivalTrack
+      ? `ARR TRACK ${trip.arrivalTrack}`
+      : scheduled ? "ARR TRACK NOT IN TIMETABLE" : "ARR TRACK NOT POSTED BY MTA";
     trackInfo.hidden = false;
     row.querySelector(".arrival-time").textContent = formatTime(trip.arrival);
     row.querySelector(".arrival-time").dateTime = new Date(trip.arrival * 1000).toISOString();
@@ -769,11 +785,24 @@ populateStations();
 updateClock();
 updateRouteLabels();
 setInterval(updateClock, 15_000);
+void loadServiceAlerts(elements.alerts, ALERTS_URL, {
+  emptyMessage: "No active LIRR service changes are reported by the MTA."
+});
+setInterval(() => {
+  void loadServiceAlerts(elements.alerts, ALERTS_URL, {
+    emptyMessage: "No active LIRR service changes are reported by the MTA."
+  });
+}, 60_000);
 elements.form.addEventListener("submit", (event) => {
   event.preventDefault();
   loadDepartures();
 });
-elements.refresh.addEventListener("click", loadDepartures);
+elements.refresh.addEventListener("click", () => {
+  loadDepartures();
+  void loadServiceAlerts(elements.alerts, ALERTS_URL, {
+    emptyMessage: "No active LIRR service changes are reported by the MTA."
+  });
+});
 elements.favorite.addEventListener("click", () => {
   const route = currentRoute();
   if (route.from === route.to) return;

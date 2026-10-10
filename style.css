@@ -278,7 +278,7 @@ h1 span { color: #819253; }
 .departure-relative { color: #777e76; font-family: var(--mono); font-size: 10px; }
 .train-name { font-size: 13px; font-weight: 700; }
 .train-summary { margin-top: 5px; color: #72796f; font-size: 11px; }
-.track-info { margin-top: 5px; color: var(--green-deep); font-family: var(--mono); font-size: 10px; font-weight: 500; }
+.track-info { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; color: var(--green-deep); font-family: var(--mono); font-size: 10px; font-weight: 700; }
 .track-info[hidden] { display: none; }
 .arrival-block { display: flex; flex-direction: column; gap: 4px; }
 .arrival-label { color: #8b8f86; font-size: 9px; }
@@ -296,6 +296,118 @@ h1 span { color: #819253; }
   align-items: end;
   gap: 18px;
 }
+.subway-discovery {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.subway-search-field input {
+  width: 100%;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid #e4e4dc;
+  border-radius: 2px;
+  background: #fafaf6;
+  color: var(--ink);
+  font-size: 14px;
+}
+.subway-search-field input:focus-visible { outline: 2px solid #578540; outline-offset: 3px; }
+.nearest-button { min-width: 194px; }
+.station-search-results {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  width: calc(100% - 204px);
+  max-height: 270px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--white);
+  box-shadow: 0 8px 22px #17211e1c;
+}
+.station-search-result {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 7px 11px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.station-search-result:hover, .station-search-result:focus-visible,
+.station-search-result[aria-selected="true"] { background: #f2f4ec; }
+.station-search-result .line-token { width: 24px; min-width: 24px; height: 24px; padding: 0; font-size: 11px; }
+.station-search-name { font-size: 12px; font-weight: 700; }
+.station-search-lines { margin-left: auto; color: var(--muted); font: 9px var(--mono); }
+.discovery-status { min-height: 0; color: #a24730; font-size: 11px; }
+.discovery-status:not(:empty) { margin: -7px 0 12px; }
+.line-selector { margin: 16px 0; }
+.line-chips { display: flex; gap: 7px; overflow-x: auto; padding: 3px 2px 7px; scrollbar-width: thin; }
+.line-chip {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--line-color, #555);
+  color: var(--badge-text, white);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.line-chip[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.line-chip:hover { transform: translateY(-1px); }
+.subway-shortcuts { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-top: 15px; }
+.subway-shortcuts > div { min-width: 0; flex: 1; }
+.station-shortcuts { display: flex; flex-wrap: wrap; gap: 7px; }
+.station-shortcut {
+  min-height: 31px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--white);
+  color: var(--ink);
+  font: 10px var(--mono);
+  cursor: pointer;
+}
+.station-shortcut:hover { background: #f2f4ec; }
+.station-shortcut .shortcut-line { margin-right: 5px; font-weight: 700; }
+.service-alerts { margin: 12px 0 0; }
+.service-alert-heading { margin: 0 0 6px; color: var(--muted); font: 9px var(--mono); letter-spacing: .08em; }
+.service-alert {
+  width: 100%;
+  display: block;
+  margin-top: 5px;
+  padding: 0;
+  border: 1px solid #e6c36b;
+  background: #fff5d8;
+  color: #654c0d;
+  text-align: left;
+}
+.service-alert summary { padding: 10px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.service-alert summary::marker { color: #a76d00; }
+.service-alert p { margin: 0; padding: 0 12px 12px; font-size: 11px; line-height: 1.6; }
+.service-alert-critical { border-color: #d9a99d; background: #fae9e4; color: #843a28; }
+.service-alert-critical summary::marker { color: #a24730; }
+.service-alert-status { display: grid; gap: 3px; padding: 9px 12px; border: 1px solid var(--line); background: #fafaf6; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.service-alert-status strong { color: var(--ink); font-size: 11px; }
+.alert-line-badge { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 7px; border-radius: 50%; background: var(--line-color); color: var(--badge-text); font-size: 10px; font-weight: 800; vertical-align: middle; }
+.offline-warning { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; padding: 10px 12px; border: 1px solid #d9a99d; background: #fae9e4; color: #843a28; font-size: 11px; }
+.offline-warning[hidden], .service-alerts[hidden], .station-search-results[hidden] { display: none; }
+.refresh-progress { width: 44px; height: 3px; overflow: hidden; background: #deded5; }
+.refresh-progress::after { display: block; width: var(--refresh-progress, 0%); height: 100%; background: #71964a; content: ""; transition: width 250ms linear; }
+.direction-tabs { display: flex; gap: 5px; margin-top: 12px; border-bottom: 1px solid var(--line); }
+.direction-tab { min-height: 38px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: 10px var(--mono); cursor: pointer; }
+.direction-tab[aria-pressed="true"] { border-bottom-color: var(--orange); color: var(--ink); font-weight: 700; }
+.mobile-quick-nav { display: none; }
 .line-token, .train-line-badge {
   width: auto;
   min-width: 27px;
@@ -325,6 +437,12 @@ h1 span { color: #819253; }
 .subway-arrival-row { grid-template-columns: 116px minmax(0, 1fr) auto; }
 .subway-arrival-row .departure-time-block { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .event-label { color: #8b8f86; font-family: var(--mono); font-size: 9px; }
+.departure-relative { color: #72796f; }
+.departure-relative.urgent { color: #a24730; font-weight: 700; }
+.departure-time { margin-top: 2px; color: #858b81; font-size: 11px; font-weight: 500; }
+.service-type { display: inline-block; padding: 3px 6px; border-radius: 2px; background: #e7efda; color: #416126; font: 9px var(--mono); text-transform: uppercase; }
+.service-type.express { background: #e7edf7; color: #284b7c; }
+.service-type[hidden] { display: none; }
 .subway-train-title { display: flex; align-items: center; gap: 10px; }
 .subway-train-title .train-name { font-size: 14px; }
 .subway-arrival-row .train-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; }
@@ -479,6 +597,35 @@ body.board-mode .status-pill { background: #25200f; color: #ffe29a; }
   .saved-trip-group { width: 100%; }
   .saved-trip { font-size: 9px; }
   .subway-controls { grid-template-columns: 1fr; gap: 13px; }
+  .subway-discovery { grid-template-columns: 1fr; }
+  .subway-search-field input { height: 45px; font-size: 16px; }
+  .nearest-button { min-width: 0; height: 44px; }
+  .station-search-results { width: 100%; top: 45px; }
+  .line-chips { gap: 9px; }
+  .line-chip { width: 38px; height: 38px; }
+  .subway-shortcuts { align-items: stretch; flex-direction: column; }
+  .subway-shortcuts .favorite-route { align-self: flex-start; min-height: 40px; }
+  .direction-tab { flex: 1; padding: 0 4px; font-size: 9px; }
+  .refresh-progress { flex: 1; }
+  body.subway-page { padding-bottom: 112px; }
+  .mobile-quick-nav {
+    position: fixed;
+    z-index: 10;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    gap: 4px;
+    padding: 7px max(14px, calc((100vw - 540px) / 2)) max(8px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+    box-shadow: 0 -6px 18px #17211e12;
+  }
+  .mobile-quick-nav .line-chips { gap: 9px; padding: 3px 2px; }
+  .mobile-quick-nav .line-chip { width: 36px; height: 36px; }
+  .mobile-direction-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .mobile-direction-tabs .direction-tab { min-height: 34px; border: 1px solid var(--line); }
+  .mobile-direction-tabs .direction-tab[aria-pressed="true"] { border-color: var(--orange); background: #f4e8df; }
   .bus-controls { grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
   .bus-controls .station-field select { height: 45px; font-size: 16px; }
   .bus-search-form { grid-template-columns: minmax(0, 1fr) 125px; gap: 8px; padding: 12px; }
