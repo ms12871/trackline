@@ -62,7 +62,6 @@ const elements = {
   departures: document.querySelector("#departures"),
   alerts: document.querySelector("#service-alerts"),
   refresh: document.querySelector("#refresh-button"),
-  favorite: document.querySelector("#favorite-route"),
   savedTrips: document.querySelector("#saved-trips"),
   template: document.querySelector("#departure-template")
 };
@@ -100,8 +99,8 @@ const TRAIN_TIME_ARRIVALS_URL = "https://backend-unified.mylirr.org/arrivals/";
 let requestNumber = 0;
 let schedulePromise;
 let renderedRouteKey = null;
-const FAVORITES_KEY = "trackline-favorite-routes";
 const RECENTS_KEY = "trackline-recent-routes";
+localStorage.removeItem("trackline-favorite-routes");
 
 function readSavedRoutes(key) {
   try {
@@ -124,15 +123,11 @@ function routeKey(route) {
 }
 
 function renderSavedTrips() {
-  const favorites = readSavedRoutes(FAVORITES_KEY);
   const recents = readSavedRoutes(RECENTS_KEY);
   const currentKey = routeKey(currentRoute());
-  const isFavorite = favorites.some((route) => routeKey(route) === currentKey);
-  elements.favorite.setAttribute("aria-pressed", String(isFavorite));
-  elements.favorite.textContent = isFavorite ? "★ Saved trip" : "☆ Save this trip";
 
   const fragment = document.createDocumentFragment();
-  for (const [label, routes] of [["FAVORITES", favorites], ["RECENT", recents]]) {
+  for (const [label, routes] of [["RECENT", recents]]) {
     if (routes.length === 0) continue;
     const group = document.createElement("div");
     group.className = "saved-trip-group";
@@ -697,7 +692,7 @@ async function loadDepartures() {
 
   localStorage.setItem("trackline-from", fromId);
   localStorage.setItem("trackline-to", toId);
-  rememberRoute({ from: fromId, to: toId }, RECENTS_KEY, 5);
+  rememberRoute({ from: fromId, to: toId }, RECENTS_KEY, 1);
   updateRouteLabels();
 
   const thisRequest = ++requestNumber;
@@ -832,17 +827,6 @@ elements.refresh.addEventListener("click", () => {
   void loadServiceAlerts(elements.alerts, ALERTS_URL, {
     emptyMessage: "No active LIRR service changes are reported by the MTA."
   });
-});
-elements.favorite.addEventListener("click", () => {
-  const route = currentRoute();
-  if (route.from === route.to) return;
-  const favorites = readSavedRoutes(FAVORITES_KEY);
-  const matchingRoute = favorites.find((item) => routeKey(item) === routeKey(route));
-  const updated = matchingRoute
-    ? favorites.filter((item) => routeKey(item) !== routeKey(route))
-    : [route, ...favorites].slice(0, 8);
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
-  renderSavedTrips();
 });
 elements.swap.addEventListener("click", () => {
   const previousFrom = elements.from.value;

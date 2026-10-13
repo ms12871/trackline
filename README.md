@@ -4,7 +4,7 @@ Trackline is a static transit board for GitHub Pages with LIRR, subway, and MTA 
 
 All three boards show expandable, live MTA service alerts: subway alerts are scoped to the selected line and station, bus alerts to the selected route, and LIRR alerts to the rail network. Alerts refresh every minute and distinguish major service impacts from other changes.
 
-On LIRR, save favorite station pairs and reopen recent trips from the route controls. The subway board supports fuzzy station and landmark search, MTA-color line shortcuts, nearby stations, pinned and recent stops, directional arrival filters, expandable service alerts, and cached arrivals with an offline warning. Subway station coordinates and route order are included in the generated station catalog.
+Each board keeps only the most recent selection for quick reopening. The subway board supports fuzzy station and landmark search, MTA-color line shortcuts, nearby stations, recent stops, directional arrival filters, expandable service alerts, and cached arrivals with an offline warning. Subway station coordinates and route order are included in the generated station catalog.
 
 All three boards support a persistent high-contrast board theme, a refresh countdown, pull-to-refresh on mobile, and keyboard shortcuts: `/` focuses the station or route selector, `R` refreshes, and `X` swaps LIRR stations. Feed errors include a retry action.
 

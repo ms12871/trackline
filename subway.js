@@ -31,6 +31,7 @@ const SEARCH_ALIASES = new Map([
   ["port authority", "42 St-Port Authority Bus Terminal"], ["pabt", "42 St-Port Authority Bus Terminal"]
 ]);
 const { transit_realtime: transitRealtime } = bindings;
+localStorage.removeItem("subway-pinned-stations");
 const elements = {
   connection: document.querySelector("#connection-label"),
   time: document.querySelector("#current-time"),
@@ -51,7 +52,6 @@ const elements = {
   searchStatus: document.querySelector("#station-search-status"),
   nearest: document.querySelector("#nearest-stations"),
   shortcuts: document.querySelector("#station-shortcuts"),
-  pin: document.querySelector("#pin-station"),
   alerts: document.querySelector("#service-alerts"),
   offline: document.querySelector("#offline-warning"),
   progress: document.querySelector("#refresh-progress")
@@ -191,8 +191,6 @@ function updateBoardLabels() {
   elements.lineToken.style.color = badgeTextColor(route);
   elements.lineToken.style.borderRadius = route?.shortName === "SIR" ? "14px" : "50%";
   elements.stationLabel.textContent = getSelectedStation()?.name || "Select a station";
-  elements.pin.setAttribute("aria-pressed", String(isPinned(selectedLine, elements.station.value)));
-  elements.pin.textContent = isPinned(selectedLine, elements.station.value) ? "★ PINNED STOP" : "☆ PIN THIS STOP";
   renderLineChips();
 }
 
@@ -421,10 +419,7 @@ function formatDataAge(updatedAt) {
 function recordRecentStation(line, stationId) {
   const station = (stationsByRoute[line] || []).find((item) => item.id === stationId);
   if (!station) return;
-  const recent = readStoredList("subway-recent-stations")
-    .filter((item) => !(item.line === line && item.stationId === stationId));
-  recent.unshift({ line, stationId, name: station.name });
-  localStorage.setItem("subway-recent-stations", JSON.stringify(recent.slice(0, 5)));
+  localStorage.setItem("subway-recent-stations", JSON.stringify([{ line, stationId, name: station.name }]));
 }
 
 function readStoredList(key) {
@@ -437,21 +432,11 @@ function readStoredList(key) {
   }
 }
 
-function getPinned() {
-  return readStoredList("subway-pinned-stations");
-}
-
-function isPinned(line, stationId) {
-  return getPinned().some((item) => item.line === line && item.stationId === stationId);
-}
-
 function renderShortcuts() {
-  const pinned = getPinned();
-  const recent = readStoredList("subway-recent-stations")
-    .filter((item) => !pinned.some((favorite) => favorite.line === item.line && favorite.stationId === item.stationId));
+  const recent = readStoredList("subway-recent-stations").slice(0, 1);
   const fragment = document.createDocumentFragment();
-  for (const [label, items] of [["★", pinned], ["RECENT", recent]]) {
-    for (const item of items.slice(0, 5)) {
+  for (const [label, items] of [["RECENT", recent]]) {
+    for (const item of items.slice(0, 1)) {
       const route = routesById.get(item.line);
       const station = (stationsByRoute[item.line] || []).find((entry) => entry.id === item.stationId);
       if (!route || !station) continue;
@@ -460,7 +445,7 @@ function renderShortcuts() {
       button.type = "button";
       const token = document.createElement("span");
       token.className = "shortcut-line";
-      token.textContent = `${label === "★" ? "★ " : ""}${route.shortName}`;
+      token.textContent = route.shortName;
       token.style.color = route.color;
       const name = document.createElement("span");
       name.textContent = station.name;
@@ -472,7 +457,7 @@ function renderShortcuts() {
   if (fragment.childNodes.length === 0) {
     const empty = document.createElement("span");
     empty.className = "saved-trip-label";
-    empty.textContent = "No pinned or recent stops yet";
+    empty.textContent = "No recent stop yet";
     fragment.append(empty);
   }
   elements.shortcuts.replaceChildren(fragment);
@@ -722,17 +707,6 @@ async function initialize() {
       void loadAlerts();
     });
     elements.nearest.addEventListener("click", locateNearestStations);
-    elements.pin.addEventListener("click", () => {
-      const station = getSelectedStation();
-      if (!station) return;
-      const pinned = getPinned();
-      const existingIndex = pinned.findIndex((item) => item.line === selectedLine && item.stationId === station.id);
-      if (existingIndex >= 0) pinned.splice(existingIndex, 1);
-      else pinned.unshift({ line: selectedLine, stationId: station.id, name: station.name });
-      localStorage.setItem("subway-pinned-stations", JSON.stringify(pinned.slice(0, 8)));
-      updateBoardLabels();
-      renderShortcuts();
-    });
     for (const tab of document.querySelectorAll(".direction-tab")) {
       tab.addEventListener("click", () => {
         selectedDirection = tab.dataset.direction;

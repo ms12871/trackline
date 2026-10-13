@@ -32,6 +32,26 @@ let selectedDirection = null;
 let selectedStop = null;
 let requestNumber = 0;
 let routeCatalogPromise = null;
+const RECENT_SELECTION_KEY = "bustime-recent-selection";
+
+function readRecentSelection() {
+  try {
+    const selection = JSON.parse(localStorage.getItem(RECENT_SELECTION_KEY) || "null");
+    return selection && typeof selection === "object" ? selection : null;
+  } catch (error) {
+    console.error("Unable to read recent BusTime selection:", error);
+    return null;
+  }
+}
+
+function saveRecentSelection() {
+  if (!selectedRoute || !selectedDirection || !selectedStop) return;
+  localStorage.setItem(RECENT_SELECTION_KEY, JSON.stringify({
+    routeId: selectedRoute.id,
+    directionId: selectedDirection.directionId,
+    stopId: selectedStop.id
+  }));
+}
 
 function routeCode(route) {
   return String(route.shortName || route.id || "").replace(/^MTA\s+[^_]+_/, "").replace(/^MTABC_/, "");
@@ -180,15 +200,20 @@ function updateBoardLabels() {
 function populateStops(direction) {
   const stops = direction.stops || [];
   fillSelect(elements.stop, stops, (stop) => stop.id, (stop) => `${stop.name}${stop.stopDirection ? ` · ${stop.stopDirection}` : ""}`);
-  selectedStop = stops[0] || null;
+  const recent = readRecentSelection();
+  selectedStop = stops.find((stop) => stop.id === recent?.stopId) || stops[0] || null;
+  if (selectedStop) elements.stop.value = selectedStop.id;
   updateBoardLabels();
+  saveRecentSelection();
   if (selectedStop) loadArrivals();
 }
 
 function populateDirections(route) {
   const directions = route.directions || [];
   fillSelect(elements.direction, directions, (direction) => direction.directionId, (direction) => direction.destination);
-  selectedDirection = directions[0] || null;
+  const recent = readRecentSelection();
+  selectedDirection = directions.find((direction) => direction.directionId === recent?.directionId) || directions[0] || null;
+  if (selectedDirection) elements.direction.value = selectedDirection.directionId;
   if (!selectedDirection || !selectedDirection.stops?.length) {
     selectedStop = null;
     fillSelect(elements.stop, [], () => "", () => "");
@@ -294,7 +319,7 @@ async function searchRoutes(query) {
       return suggestion.description ? `${code} · ${suggestion.description}` : code;
     });
 
-    const preferredRouteId = localStorage.getItem("bustime-route");
+    const preferredRouteId = readRecentSelection()?.routeId || localStorage.getItem("bustime-route");
     const normalizedQuery = normalizeRouteCode(searchText);
     const matchingRoute = uniqueSuggestions.find((route) => normalizeRouteCode(routeCode(route)) === normalizedQuery);
     const chosenRouteId = matchingRoute?.id || (uniqueSuggestions.some((route) => route.id === preferredRouteId)
@@ -461,6 +486,7 @@ elements.direction.addEventListener("change", updateDirection);
 elements.stop.addEventListener("change", () => {
   selectedStop = (selectedDirection?.stops || []).find((stop) => stop.id === elements.stop.value) || null;
   updateBoardLabels();
+  saveRecentSelection();
   loadArrivals();
 });
 elements.refresh.addEventListener("click", () => {
