@@ -407,7 +407,6 @@ h1 span { color: #819253; }
 .direction-tabs { display: flex; gap: 5px; margin-top: 12px; border-bottom: 1px solid var(--line); }
 .direction-tab { min-height: 38px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: 10px var(--mono); cursor: pointer; }
 .direction-tab[aria-pressed="true"] { border-bottom-color: var(--orange); color: var(--ink); font-weight: 700; }
-.mobile-quick-nav { display: none; }
 .line-token, .train-line-badge {
   width: auto;
   min-width: 27px;
@@ -615,13 +614,14 @@ body.dark-mode .site-footer a:hover { color: var(--ink); }
 @keyframes row-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 700px) {
-  .app-shell { width: min(100% - 36px, 540px); }
-  .topbar { height: 67px; }
-  .topbar-right { gap: 0; }
+  .app-shell { width: min(calc(100% - 32px), 540px); }
+  .topbar { height: auto; min-height: 67px; gap: 10px; }
+  .wordmark { flex: 0 0 auto; }
+  .topbar-right { min-width: 0; flex: 1; justify-content: flex-end; gap: 0; }
   .network-label { display: none; }
   .live-indicator { display: none; }
-  .network-nav { gap: 4px; }
-  .network-switch { min-height: 44px; padding: 0 7px; font-size: 10px; }
+  .network-nav { flex: 0 0 auto; gap: 4px; }
+  .network-switch { min-height: 44px; padding: 0 clamp(5px, 1.5vw, 8px); font-size: 10px; white-space: nowrap; }
   .icon-button { width: 44px; height: 44px; }
   .route-section { padding: 38px 0 34px; }
   .intro-row { flex-direction: column; align-items: stretch; gap: 16px; margin: 19px 0 25px; }
@@ -648,37 +648,19 @@ body.dark-mode .site-footer a:hover { color: var(--ink); }
   .route-shortcuts { gap: 8px; }
   .saved-trips { flex-basis: 100%; }
   .saved-trip-group { width: 100%; }
+  .favorite-route, .saved-trip, .station-shortcut { min-height: 40px; }
   .saved-trip { font-size: 9px; }
   .subway-controls { grid-template-columns: 1fr; gap: 13px; }
   .subway-discovery { grid-template-columns: 1fr; }
   .subway-search-field input { height: 45px; font-size: 16px; }
   .nearest-button { min-width: 0; height: 44px; }
-  .station-search-results { width: 100%; top: 45px; }
+  .station-search-results { top: calc(100% - 54px); width: 100%; max-height: min(270px, 45vh); }
   .line-chips { gap: 9px; }
-  .line-chip { width: 38px; height: 38px; }
+  .line-chip { width: 40px; height: 40px; }
   .subway-shortcuts { align-items: stretch; flex-direction: column; }
   .subway-shortcuts .favorite-route { align-self: flex-start; min-height: 40px; }
-  .direction-tab { flex: 1; padding: 0 4px; font-size: 9px; }
+  .direction-tab { flex: 1; min-height: 44px; padding: 0 4px; font-size: 9px; }
   .refresh-progress { flex: 1; }
-  body.subway-page { padding-bottom: 112px; }
-  .mobile-quick-nav {
-    position: fixed;
-    z-index: 10;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    display: grid;
-    gap: 4px;
-    padding: 7px max(14px, calc((100vw - 540px) / 2)) max(8px, env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: var(--paper);
-    box-shadow: 0 -6px 18px #17211e12;
-  }
-  .mobile-quick-nav .line-chips { gap: 9px; padding: 3px 2px; }
-  .mobile-quick-nav .line-chip { width: 36px; height: 36px; }
-  .mobile-direction-tabs { display: grid; grid-template-columns: 1fr 1fr; }
-  .mobile-direction-tabs .direction-tab { min-height: 34px; border: 1px solid var(--line); }
-  .mobile-direction-tabs .direction-tab[aria-pressed="true"] { border-color: var(--orange); background: #f4e8df; }
   .bus-controls { grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
   .bus-controls .station-field select { height: 45px; font-size: 16px; }
   .bus-search-form { grid-template-columns: minmax(0, 1fr) 125px; gap: 8px; padding: 12px; }
@@ -695,7 +677,17 @@ body.dark-mode .site-footer a:hover { color: var(--ink); }
   .departure-time-block { display: block; }
   .departure-relative { display: block; margin-top: 4px; }
   .arrival-time { font-size: 13px; }
-  .status-block { grid-column: 2 / -1; justify-self: start; margin: -13px 0 10px; }
+  .departure-details { min-width: 0; overflow-wrap: anywhere; }
+  .track-info {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    font-size: 9px;
+    line-height: 1.5;
+  }
+  .track-info span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  .itinerary-heading strong { min-width: 0; overflow-wrap: anywhere; }
+  .status-block { grid-column: 2 / -1; grid-row: 2; justify-self: start; margin: 5px 0 10px; }
   .subway-arrival-row { grid-template-columns: 90px minmax(0, 1fr); }
   .bus-arrival-row { grid-template-columns: 90px minmax(0, 1fr); }
   .subway-arrival-row .departure-details { min-width: 0; }
@@ -710,6 +702,7 @@ body.dark-mode .site-footer a:hover { color: var(--ink); }
   .bus-arrival-row .status-block { grid-column: 2 / -1; margin: 5px 0 10px; padding-left: 0; }
   .status-pill { min-height: 22px; font-size: 9px; }
   .board-meta { align-items: flex-start; flex-direction: column; justify-content: center; gap: 6px; padding: 8px 0; }
+  .board-route { min-width: 0; flex-wrap: wrap; gap: 6px 10px; }
   .updated-label { font-size: 9px; }
   .board-footer { flex-wrap: wrap; justify-content: space-between; padding: 8px 0; }
   .board-footer .source-label { flex-basis: 100%; }

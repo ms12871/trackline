@@ -8,7 +8,7 @@ On LIRR, save favorite station pairs and reopen recent trips from the route cont
 
 All three boards support a persistent high-contrast board theme, a refresh countdown, pull-to-refresh on mobile, and keyboard shortcuts: `/` focuses the station or route selector, `R` refreshes, and `X` swaps LIRR stations. Feed errors include a retry action.
 
-LIRR results include Jamaica transfer itineraries alongside direct trains. Transfers require at least 6 minutes and allow up to 25 minutes; departure and arrival track/platform assignments are shown prominently when supplied by MTA, without exposing internal trip IDs. Track assignments are not included in every realtime update or in the static timetable, so those cases are explicitly labeled as not posted or not in the timetable. When live data cannot form a connection, the static timetable is used and those legs are explicitly labeled scheduled. For Penn Station and Grand Central Madison searches, the other Manhattan terminal is shown as an alternate transfer destination when a connection is available.
+LIRR results include Jamaica transfer itineraries alongside direct trains. Transfers require at least 6 minutes and allow up to 25 minutes; departure and arrival track/platform assignments are shown when supplied by MTA, without exposing internal trip IDs. Missing track assignments are omitted. When live data cannot form a connection, the static timetable is used and those legs are explicitly labeled scheduled. For Penn Station and Grand Central Madison searches, the other Manhattan terminal is shown as an alternate transfer destination when a connection is available.
 
 ## Live URL 
 

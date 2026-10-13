@@ -550,7 +550,7 @@ function showMessage(kind, heading, message, linkLabel, linkHref) {
   elements.departures.replaceChildren(state);
 }
 
-function appendItineraryStop(timeline, timestamp, station, detail, endpoint = false) {
+function appendItineraryStop(timeline, timestamp, station, track, event, endpoint = false) {
   const stop = document.createElement("div");
   stop.className = `itinerary-stop${endpoint ? " itinerary-endpoint" : ""}`;
   const time = document.createElement("time");
@@ -558,9 +558,12 @@ function appendItineraryStop(timeline, timestamp, station, detail, endpoint = fa
   time.textContent = formatTime(timestamp);
   const name = document.createElement("strong");
   name.textContent = station;
-  const description = document.createElement("span");
-  description.textContent = detail;
-  stop.append(time, name, description);
+  stop.append(time, name);
+  if (track) {
+    const description = document.createElement("span");
+    description.textContent = `${event} · Track ${track}`;
+    stop.append(description);
+  }
   timeline.append(stop);
 }
 
@@ -601,20 +604,16 @@ function renderTransferDepartures(itineraries, append = false) {
 
       const timeline = document.createElement("div");
       timeline.className = "itinerary-timeline";
-      const trackDetail = (track, event, scheduled) => {
-        if (track) return `${event} · Track ${track}`;
-        return scheduled ? `${event} · Track unavailable on timetable` : `${event} · Track not posted`;
-      };
-      appendItineraryStop(timeline, firstLeg.departure, stationNames.get(elements.from.value), trackDetail(firstLeg.departureTrack, "Departs", firstLeg.scheduled), true);
-      appendItineraryStop(timeline, firstLeg.arrival, "Jamaica", trackDetail(firstLeg.arrivalTrack, "Arrives", firstLeg.scheduled));
+      appendItineraryStop(timeline, firstLeg.departure, stationNames.get(elements.from.value), firstLeg.departureTrack, "Departs", true);
+      appendItineraryStop(timeline, firstLeg.arrival, "Jamaica", firstLeg.arrivalTrack, "Arrives");
 
       const transfer = document.createElement("div");
       transfer.className = "transfer-wait";
       transfer.textContent = `${Math.round(layover / 60)} MIN TRANSFER`;
       timeline.append(transfer);
 
-      appendItineraryStop(timeline, secondLeg.departure, "Jamaica", trackDetail(secondLeg.departureTrack, "Departs", secondLeg.scheduled));
-      appendItineraryStop(timeline, secondLeg.arrival, stationNames.get(destinationId), trackDetail(secondLeg.arrivalTrack, "Arrives", secondLeg.scheduled), true);
+      appendItineraryStop(timeline, secondLeg.departure, "Jamaica", secondLeg.departureTrack, "Departs");
+      appendItineraryStop(timeline, secondLeg.arrival, stationNames.get(destinationId), secondLeg.arrivalTrack, "Arrives", true);
       card.append(heading, timeline);
       section.append(card);
     }
@@ -644,13 +643,15 @@ function renderDepartures(trips, scheduled = false) {
     row.querySelector(".train-name").textContent = trip.route === "LIRR" ? "Long Island Rail Road" : `LIRR · ${trip.route}`;
     row.querySelector(".train-summary").textContent = scheduled ? "Scheduled service" : "Live service";
     const trackInfo = row.querySelector(".track-info");
-    row.querySelector(".departure-track-info").textContent = trip.departureTrack
-      ? `DEP TRACK ${trip.departureTrack}`
-      : scheduled ? "DEP TRACK NOT IN TIMETABLE" : "DEP TRACK NOT POSTED BY MTA";
-    row.querySelector(".arrival-track-info").textContent = trip.arrivalTrack
-      ? `ARR TRACK ${trip.arrivalTrack}`
-      : scheduled ? "ARR TRACK NOT IN TIMETABLE" : "ARR TRACK NOT POSTED BY MTA";
-    trackInfo.hidden = false;
+    const trackAssignments = [];
+    if (trip.departureTrack) trackAssignments.push([".departure-track-info", `DEP TRACK ${trip.departureTrack}`]);
+    if (trip.arrivalTrack) trackAssignments.push([".arrival-track-info", `ARR TRACK ${trip.arrivalTrack}`]);
+    for (const [selector, text] of trackAssignments) {
+      const detail = row.querySelector(selector);
+      detail.textContent = text;
+      detail.hidden = false;
+    }
+    trackInfo.hidden = trackAssignments.length === 0;
     row.querySelector(".arrival-time").textContent = formatTime(trip.arrival);
     row.querySelector(".arrival-time").dateTime = new Date(trip.arrival * 1000).toISOString();
 

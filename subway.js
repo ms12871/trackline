@@ -46,7 +46,6 @@ const elements = {
   error: document.querySelector("#subway-error"),
   template: document.querySelector("#arrival-template"),
   lineChips: document.querySelector("#line-chips"),
-  mobileLineChips: document.querySelector("#mobile-line-chips"),
   search: document.querySelector("#station-search"),
   searchResults: document.querySelector("#station-search-results"),
   searchStatus: document.querySelector("#station-search-status"),
@@ -146,24 +145,22 @@ function populateLines() {
 }
 
 function renderLineChips() {
-  for (const container of [elements.lineChips, elements.mobileLineChips]) {
-    const fragment = document.createDocumentFragment();
-    for (const route of routesById.values()) {
-      if (HIDDEN_LINE_VARIANTS.has(route.id)) continue;
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "line-chip";
-      chip.textContent = route.shortName;
-      chip.title = route.name;
-      chip.setAttribute("aria-label", `${route.shortName}, ${route.name}`);
-      chip.setAttribute("aria-pressed", String(route.id === selectedLine));
-      chip.style.setProperty("--line-color", route.color || "#555");
-      chip.style.setProperty("--badge-text", badgeTextColor(route));
-      chip.addEventListener("click", () => setLine(route.id));
-      fragment.append(chip);
-    }
-    container.replaceChildren(fragment);
+  const fragment = document.createDocumentFragment();
+  for (const route of routesById.values()) {
+    if (HIDDEN_LINE_VARIANTS.has(route.id)) continue;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "line-chip";
+    chip.textContent = route.shortName;
+    chip.title = route.name;
+    chip.setAttribute("aria-label", `${route.shortName}, ${route.name}`);
+    chip.setAttribute("aria-pressed", String(route.id === selectedLine));
+    chip.style.setProperty("--line-color", route.color || "#555");
+    chip.style.setProperty("--badge-text", badgeTextColor(route));
+    chip.addEventListener("click", () => setLine(route.id));
+    fragment.append(chip);
   }
+  elements.lineChips.replaceChildren(fragment);
 }
 
 function populateStations(line, preferredId = null) {
