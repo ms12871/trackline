@@ -1,0 +1,10 @@
+{
+  "name": "Trackline Trip Planner",
+  "short_name": "Trackline",
+  "start_url": "./planner.html",
+  "display": "standalone",
+  "background_color": "#f3f2ec",
+  "theme_color": "#f3f2ec",
+  "description": "Multimodal trips across New York transit.",
+  "icons": []
+}

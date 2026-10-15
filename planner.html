@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f3f2ec">
+    <meta name="description" content="Multimodal trip planning across LIRR, subway, bus, and walking.">
+    <title>Trackline | Trip planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <script src="router-config.js"></script>
+    <script type="module" src="planner.js"></script>
+  </head>
+  <body class="planner-page">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="wordmark" href="./" aria-label="Trackline home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>trackline<span class="wordmark-period">.</span></span>
+        </a>
+        <div class="topbar-right">
+          <span class="network-label">TRIP PLANNER</span>
+          <nav class="network-nav" aria-label="Transit mode">
+            <a class="network-switch" href="index.html">LIRR</a>
+            <a class="network-switch" href="subway.html">Subway</a>
+            <a class="network-switch" href="bustime.html">BusTime</a>
+            <a class="network-switch" href="planner.html" aria-current="page">Plan</a>
+          </nav>
+        </div>
+      </header>
+
+      <main>
+        <section class="route-section planner-hero" aria-labelledby="page-title">
+          <div class="section-kicker"><span class="kicker-rule"></span> LIRR · SUBWAY · BUS · WALK</div>
+          <div class="intro-row">
+            <div>
+              <h1 id="page-title">Go anywhere.<br><span>Know every step.</span></h1>
+              <p class="intro-copy">Live, multimodal directions for New York.</p>
+            </div>
+            <div class="service-clock"><span class="clock-label">NEW YORK TIME</span><time id="current-time">--:--</time><span id="current-date" class="date-label">---</span></div>
+          </div>
+
+          <form id="planner-form" class="planner-form">
+            <label class="station-field">
+              <span class="field-label"><span class="station-marker origin-marker"></span> FROM</span>
+              <div class="planner-input-row">
+                <input id="origin-input" type="search" placeholder="Where are you?" autocomplete="off" required>
+                <button id="locate-button" class="locate-button" type="button" aria-label="Use my current location" title="Use my current location">◎</button>
+              </div>
+              <div id="origin-results" class="planner-results" role="listbox" hidden></div>
+            </label>
+            <button id="planner-swap" class="swap-button" type="button" aria-label="Swap origin and destination">↕</button>
+            <label class="station-field">
+              <span class="field-label"><span class="station-marker destination-marker"></span> TO</span>
+              <input id="destination-input" type="search" placeholder="Where to?" autocomplete="off" required>
+              <div id="destination-results" class="planner-results" role="listbox" hidden></div>
+            </label>
+            <button class="find-button" type="submit"><span>Plan trip</span><span aria-hidden="true">→</span></button>
+          </form>
+          <div class="mobile-location-actions" aria-label="Saved places">
+            <button type="button" data-place-action="current">◎ Current location</button>
+            <button type="button" data-place-action="home">⌂ Home</button>
+            <button type="button" data-place-action="work">▣ Work</button>
+          </div>
+          <p id="location-status" class="planner-status" role="status" aria-live="polite">Search any NYC address, station, landmark, or ZIP code.</p>
+          <div class="planner-options">
+            <label><span>PRIORITY</span><select id="route-priority"><option value="balanced">Balanced</option><option value="fewest-transfers">Fewest transfers</option><option value="fastest">Fastest</option></select></label>
+          </div>
+          <div id="planner-error" class="route-error" role="alert" hidden></div>
+        </section>
+
+        <section class="planner-results-layout" aria-label="Trip results">
+          <div class="planner-main">
+            <div class="departures-heading">
+              <div><div class="section-kicker"><span class="kicker-rule"></span> YOUR ITINERARY</div><h2 id="itinerary-title">Ready when you are</h2></div>
+              <div class="planner-actions"><button id="refresh-trip" class="icon-button" type="button" aria-label="Refresh trip"></button><a id="open-maps" class="open-maps-button" target="_blank" rel="noreferrer" hidden>Open in Maps ↗</a></div>
+            </div>
+            <div id="planner-meta" class="planner-meta" hidden></div>
+            <div id="itinerary" class="itinerary-list"><div class="planner-empty"><strong>Start with your location.</strong><span>Choose a destination, then Trackline will build a walk → transit → walk itinerary.</span></div></div>
+            <div id="planner-alerts" class="service-alerts" role="region" aria-label="Live MTA service updates" hidden></div>
+          </div>
+          <div class="planner-map-wrap">
+            <div id="planner-map" aria-label="Trip map"></div>
+            <div class="map-legend"><span><i class="legend-walk"></i> Walk</span><span><i class="legend-transit"></i> Transit</span><span id="map-provider">DEMO ROUTE</span></div>
+          </div>
+        </section>
+      </main>
+      <footer class="site-footer"><span>Made with Love from Zafar</span><span>ADDRESS SEARCH BY <a href="https://www.openstreetmap.org/" target="_blank" rel="noreferrer">OPENSTREETMAP</a><span id="geoapify-credit" hidden> · <a href="https://www.geoapify.com/" target="_blank" rel="noreferrer">GEOAPIFY</a></span></span><a href="https://www.mta.info/" target="_blank" rel="noreferrer">DATA BY MTA ↗</a></footer>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  </body>
+</html>
